@@ -5,6 +5,7 @@ import { errorHandler } from './middleware/errorHandler.js';
 import authRoutes from './routes/auth.routes.js';
 import scheduleRoutes from './routes/schedule.routes.js';
 import dashboardRoutes from './routes/dashboard.routes.js';
+import teacherRoutes from './routes/teacher.routes.js'; // Import the new teacher routes
 
 
 const app = express();
