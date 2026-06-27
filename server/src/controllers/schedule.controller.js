@@ -75,7 +75,6 @@ export const createSchedule = async (req, res) => {
     }
 
     // ─── DYNAMIC RELATION HOOKS ──────────────────────────────────────────
-    // Fetch active school year and current semester automatically from your tables
     const [activeYear, currentSemester] = await Promise.all([
       prisma.schoolYear.findFirst({ where: { isCurrent: true } }),
       prisma.semester.findFirst({ where: { isCurrent: true } })
@@ -88,7 +87,6 @@ export const createSchedule = async (req, res) => {
       });
     }
 
-    // Fallback logic for subjectOfferingId if your form hasn't built selection inputs yet
     let targetSubjectOfferingId = subjectOfferingId;
     if (!targetSubjectOfferingId) {
       const fallbackOffering = await prisma.subjectOffering.findFirst();
@@ -102,7 +100,6 @@ export const createSchedule = async (req, res) => {
     }
     // ─────────────────────────────────────────────────────────────────────
 
-    // Look for existing overlaps across Teacher, Room, or Section
     const conflictingSchedule = await prisma.schedule.findFirst({
       where: {
         dayOfWeek,
@@ -115,10 +112,10 @@ export const createSchedule = async (req, res) => {
         ],
         AND: [
           {
-            startTime: { lt: endTime } // Starts before the new one ends
+            startTime: { lt: endTime }
           },
           {
-            endTime: { gt: startTime } // Ends after the new one starts
+            endTime: { gt: startTime }
           }
         ]
       },
@@ -129,7 +126,6 @@ export const createSchedule = async (req, res) => {
       }
     });
 
-    // If a conflict is discovered, stop execution and inform the client
     if (conflictingSchedule) {
       let resource = "resource";
       if (conflictingSchedule.teacherId === teacherId) {
@@ -146,7 +142,6 @@ export const createSchedule = async (req, res) => {
       });
     }
 
-    // No conflicts found -> Proceed safely to create the database entry
     const newSchedule = await prisma.schedule.create({
       data: {
         teacherId,
@@ -176,11 +171,106 @@ export const createSchedule = async (req, res) => {
   }
 };
 
-// 4. UPDATE SCHEDULE PLACEHOLDER
+// 4. UPDATE SCHEDULE (Fully Functional with Overlap Validation)
 export const updateSchedule = async (req, res) => {
   try {
-    return res.status(200).json({ success: true, message: "Update functional endpoint stub active." });
+    const { id } = req.params;
+    const { 
+      teacherId, 
+      roomId, 
+      sectionId, 
+      subjectOfferingId, 
+      dayOfWeek, 
+      startTime, 
+      endTime 
+    } = req.body;
+
+    const [activeYear, currentSemester] = await Promise.all([
+      prisma.schoolYear.findFirst({ where: { isCurrent: true } }),
+      prisma.semester.findFirst({ where: { isCurrent: true } })
+    ]);
+
+    const conflictingSchedule = await prisma.schedule.findFirst({
+      where: {
+        id: { not: id },
+        dayOfWeek,
+        schoolYearId: activeYear?.id,
+        semesterId: currentSemester?.id,
+        OR: [
+          { teacherId },
+          { roomId },
+          { sectionId }
+        ],
+        AND: [
+          { startTime: { lt: endTime } },
+          { endTime: { gt: startTime } }
+        ]
+      },
+      include: {
+        teacher: { include: { user: true } },
+        room: true,
+        section: true
+      }
+    });
+
+    if (conflictingSchedule) {
+      let resource = "resource";
+      if (conflictingSchedule.teacherId === teacherId) {
+        resource = `Teacher (${conflictingSchedule.teacher.user.firstName} ${conflictingSchedule.teacher.user.lastName})`;
+      } else if (conflictingSchedule.roomId === roomId) {
+        resource = `Room (${conflictingSchedule.room.name})`;
+      } else if (conflictingSchedule.sectionId === sectionId) {
+        resource = `Section (${conflictingSchedule.section.name})`;
+      }
+
+      return res.status(409).json({
+        success: false,
+        message: `Update failed: Conflict detected! This ${resource} is already booked from ${conflictingSchedule.startTime} to ${conflictingSchedule.endTime}.`
+      });
+    }
+
+    const updatedSchedule = await prisma.schedule.update({
+      where: { id },
+      data: {
+        teacherId,
+        roomId,
+        sectionId,
+        subjectOfferingId,
+        dayOfWeek,
+        startTime,
+        endTime
+      }
+    });
+
+    return res.status(200).json({ 
+      success: true, 
+      data: updatedSchedule,
+      message: "Schedule updated successfully!" 
+    });
   } catch (error) {
-    return res.status(500).json({ success: false, error: error.message });
+    console.error("Error updating schedule:", error);
+    return res.status(500).json({ success: false, message: "Internal server error while updating." });
+  }
+};
+
+// 5. DELETE SCHEDULE
+export const deleteSchedule = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    await prisma.schedule.delete({
+      where: { id }
+    });
+
+    return res.status(200).json({ 
+      success: true, 
+      message: "Schedule deleted successfully!" 
+    });
+  } catch (error) {
+    console.error("Error deleting schedule:", error);
+    return res.status(500).json({ 
+      success: false, 
+      message: "Internal server error while deleting." 
+    });
   }
 };

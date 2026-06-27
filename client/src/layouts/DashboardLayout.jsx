@@ -24,6 +24,8 @@ export default function DashboardLayout() {
   const navigationItems = [
     { text: 'Dashboard View', path: '/dashboard', icon: <DashIcon />, roles: ['ADMINISTRATOR', 'REGISTRAR_SCHEDULER', 'INSTRUCTOR', 'STUDENT'] },
     { text: 'Manage Schedules', path: '/schedules', icon: <SchedIcon />, roles: ['ADMINISTRATOR', 'REGISTRAR_SCHEDULER'] },
+    // ADDED: Navigation configuration for the new Teacher/Faculty view
+    { text: 'Manage Teachers', path: '/teachers', icon: <AdminIcon />, roles: ['ADMINISTRATOR', 'REGISTRAR_SCHEDULER'] },
   ];
 
   const drawerContent = (

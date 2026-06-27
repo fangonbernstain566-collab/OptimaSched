@@ -5,6 +5,7 @@ import DashboardLayout from './layouts/DashboardLayout';
 import DashboardView from './pages/view/DashboardView'; // Imported and verified path
 import ProtectedRoute from './components/ProtectedRoute';
 import Schedules from './pages/Schedules';
+import TeacherManager from './components/TeacherManager'; // Imported and verified path
 
 export default function App() {
   return (
@@ -31,6 +32,14 @@ export default function App() {
           element={
             <ProtectedRoute allowedRoles={['ADMINISTRATOR', 'REGISTRAR_SCHEDULER']}>
               <Schedules />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="teachers" 
+          element={
+            <ProtectedRoute allowedRoles={['ADMINISTRATOR']}>
+              <TeacherManager />
             </ProtectedRoute>
           } 
         />
