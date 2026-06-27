@@ -1,0 +1,166 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Role {
+  id    String   @id @default(uuid())
+  name  RoleName @unique
+  users User[]
+}
+
+model User {
+  id           String     @id @default(uuid())
+  email        String     @unique
+  passwordHash String
+  firstName    String
+  lastName     String
+  roleId       String
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  auditLogs    AuditLog[]
+  teacher      Teacher?
+  role         Role       @relation(fields: [roleId], references: [id])
+}
+
+model College {
+  id          String       @id @default(uuid())
+  name        String
+  code        String       @unique
+  departments Department[]
+}
+
+model Department {
+  id        String    @id @default(uuid())
+  name      String
+  code      String    @unique
+  collegeId String
+  college   College   @relation(fields: [collegeId], references: [id], onDelete: Cascade)
+  teachers  Teacher[]
+}
+
+model Teacher {
+  id              String         @id @default(uuid())
+  userId          String         @unique
+  departmentId    String
+  maxTeachingLoad Int            @default(21)
+  availabilities  Availability[]
+  schedules       Schedule[]
+  department      Department     @relation(fields: [departmentId], references: [id])
+  user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Availability {
+  id        String  @id @default(uuid())
+  teacherId String
+  dayOfWeek String
+  startTime String
+  endTime   String
+  teacher   Teacher @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+}
+
+model Building {
+  id    String @id @default(uuid())
+  name  String @unique
+  rooms Room[]
+}
+
+model Room {
+  id         String     @id @default(uuid())
+  name       String
+  capacity   Int
+  type       RoomType   @default(LECTURE_ROOM)
+  buildingId String
+  building   Building   @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  schedules  Schedule[]
+}
+
+model Subject {
+  id            String            @id @default(uuid())
+  code          String            @unique
+  name          String
+  units         Int
+  isLabRequired Boolean           @default(false)
+  offerings     SubjectOffering[]
+}
+
+model SubjectOffering {
+  id        String     @id @default(uuid())
+  subjectId String
+  schedules Schedule[]
+  subject   Subject    @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+}
+
+model Section {
+  id        String     @id @default(uuid())
+  name      String     @unique
+  schedules Schedule[]
+}
+
+model SchoolYear {
+  id        String     @id @default(uuid())
+  name      String     @unique
+  isCurrent Boolean    @default(false)
+  schedules Schedule[]
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  action    String
+  userId    String
+  details   Json
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+}
+
+model Semester {
+  id        String     @id @default(uuid())
+  name      String
+  isCurrent Boolean    @default(false)
+  schedules Schedule[]
+}
+
+model Schedule {
+  id                String          @id @default(uuid())
+  teacherId         String
+  roomId            String
+  sectionId         String
+  subjectOfferingId String
+  schoolYearId      String
+  semesterId        String
+  dayOfWeek         String
+  startTime         String
+  endTime           String
+  status            ScheduleStatus  @default(DRAFT)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  room              Room            @relation(fields: [roomId], references: [id])
+  schoolYear        SchoolYear      @relation(fields: [schoolYearId], references: [id])
+  section           Section         @relation(fields: [sectionId], references: [id])
+  semester          Semester        @relation(fields: [semesterId], references: [id])
+  subjectOffering   SubjectOffering @relation(fields: [subjectOfferingId], references: [id])
+  teacher           Teacher         @relation(fields: [teacherId], references: [id])
+}
+
+enum RoleName {
+  ADMINISTRATOR
+  REGISTRAR_SCHEDULER
+  INSTRUCTOR
+  STUDENT
+}
+
+enum RoomType {
+  LECTURE_ROOM
+  COMPUTER_LABORATORY
+  LABORATORY
+}
+
+enum ScheduleStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
