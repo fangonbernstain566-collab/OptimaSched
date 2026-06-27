@@ -1,9 +1,12 @@
 import 'dotenv/config';
 import { prisma } from '../src/config/prisma.js';
+import bcrypt from 'bcrypt'; // Switch to 'bcryptjs' if your project uses it
 
 async function main() {
   console.log('🌱 Starting database seeding...');
-
+  const defaultPassword = "Password123!";
+  const passwordHash = await bcrypt.hash(defaultPassword, 10);
+  
   // 1. Create Current School Year
   const schoolYear = await prisma.schoolYear.upsert({
     where: { name: '2026-2027' },

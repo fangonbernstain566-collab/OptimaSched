@@ -11,14 +11,14 @@ router.post('/', async (req, res) => {
 
   try {
     // 1. DYNAMIC ROLE RESOLUTION
-    // Ensures the TEACHER structural role exists in your database
+    // Ensures the INSTRUCTOR structural role exists in your database
     let teacherRole = await prisma.role.findFirst({
-      where: { name: 'TEACHER' }
+      where: { name: 'INSTRUCTOR' }
     });
 
     if (!teacherRole) {
       teacherRole = await prisma.role.create({
-        data: { name: 'TEACHER' }
+        data: { name: 'INSTRUCTOR' }
       });
     }
 
