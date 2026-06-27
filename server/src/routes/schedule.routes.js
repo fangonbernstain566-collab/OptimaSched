@@ -1,18 +1,16 @@
-import { Router } from 'express';
-// Add "getScheduleOptions" inside the curly braces below:
-import { 
-  getSchedules, 
-  createSchedule, 
-  updateSchedule, 
-  getScheduleOptions 
+import express from 'express';
+import {
+  getSchedules,
+  getScheduleOptions,
+  createSchedule,
+  updateSchedule,
 } from '../controllers/schedule.controller.js';
-import { authenticate } from '../middleware/auth.js'; // Assuming this is where your authenticate middleware lives
 
-const router = Router();
+const router = express.Router();
 
-router.get('/', authenticate, getSchedules);
-router.get('/options', authenticate, getScheduleOptions); // Now it's defined and safe!
-router.post('/', authenticate, createSchedule);
-router.put('/:id', authenticate, updateSchedule);
+router.get('/', getSchedules);
+router.get('/options', getScheduleOptions);
+router.post('/', createSchedule);
+router.put('/:id', updateSchedule);
 
 export default router;

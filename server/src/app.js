@@ -4,6 +4,7 @@ import 'dotenv/config';
 import { errorHandler } from './middleware/errorHandler.js';
 import authRoutes from './routes/auth.routes.js';
 import scheduleRoutes from './routes/schedule.routes.js';
+import dashboardRoutes from './routes/dashboard.routes.js';
 
 
 const app = express();
@@ -23,9 +24,26 @@ app.get('/api/health', (req, res) => {
 // Future API routes wrapper location
 app.use('/api/auth', authRoutes);
 app.use('/api/schedules', scheduleRoutes);
+app.use('/api/dashboard', dashboardRoutes);
 // Centralized error interceptor fallback hook (Must remain last)
 app.use(errorHandler);
 
-app.listen(PORT, () => {
-  console.log(`🚀 OptimaSched core service running smoothly on port ${PORT}`);
-});
+
+import { prisma } from './config/prisma.js';
+
+async function startServer() {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    console.log('✅ Database connection verified.');
+
+    app.listen(PORT, () => {
+      console.log(`🚀 OptimaSched core service running smoothly on port ${PORT}`);
+    });
+  } catch (error) {
+    console.error('❌ Failed to start server due to database connection error:');
+    console.error(error);
+    process.exit(1);
+  }
+}
+
+startServer();
