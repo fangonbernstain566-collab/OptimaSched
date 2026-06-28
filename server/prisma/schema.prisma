@@ -135,7 +135,7 @@ model Schedule {
   dayOfWeek         String
   startTime         String
   endTime           String
-  status            ScheduleStatus  @default(DRAFT)
+  status            ScheduleStatus  @default(PENDING)
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
   room              Room            @relation(fields: [roomId], references: [id])
@@ -163,4 +163,6 @@ enum ScheduleStatus {
   DRAFT
   ACTIVE
   ARCHIVED
+  PENDING
+  SCHEDULED
 }

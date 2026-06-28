@@ -1,65 +1,127 @@
 import { Router } from 'express';
-import prisma from '../config/prisma.js'; 
+import prisma from '../config/prisma.js';
+import bcrypt from 'bcrypt';
 
 const router = Router();
 
-// POST: Onboard a New Faculty Teacher Profile
-// Accessible via: POST http://localhost:5000/api/teachers
-// POST: Onboard a New Faculty Teacher Profile
+router.get('/all', async (req, res) => {
+  try {
+    const teachers = await prisma.user.findMany({
+      where: { role: { name: 'FACULTY' } }, // Match your enum name!
+      select: { id: true, firstName: true, lastName: true }
+    });
+    res.json({ success: true, data: teachers });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 router.post('/', async (req, res) => {
-  const { firstName, lastName, email, maxTeachingLoad, departmentName } = req.body;
+  const {
+    firstName,
+    lastName,
+    email,
+    maxTeachingLoad,
+    departmentName,
+  } = req.body;
 
   try {
-    // 1. DYNAMIC ROLE RESOLUTION
-    // Ensures the INSTRUCTOR structural role exists in your database
+    if (!firstName || !lastName || !email || !departmentName) {
+      return res.status(400).json({
+        success: false,
+        message: 'firstName, lastName, email, and departmentName are required.',
+      });
+    }
+
+    const normalizedEmail = email.toLowerCase().trim();
+
     let teacherRole = await prisma.role.findFirst({
-      where: { name: 'INSTRUCTOR' }
+      where: {
+        name: 'INSTRUCTOR',
+      },
     });
 
     if (!teacherRole) {
       teacherRole = await prisma.role.create({
-        data: { name: 'INSTRUCTOR' }
+        data: {
+          name: 'INSTRUCTOR',
+        },
       });
     }
 
-    // 2. DYNAMIC USER CREATION OR RESOLUTION
+    const defaultPassword = 'Password123!';
+    const passwordHash = await bcrypt.hash(defaultPassword, 10);
+
     const targetUser = await prisma.user.upsert({
-      where: { email: email.toLowerCase().trim() },
-      update: {}, 
-      create: {
-        email: email.toLowerCase().trim(),
+      where: {
+        email: normalizedEmail,
+      },
+      update: {
         firstName,
         lastName,
         role: {
-          connect: { id: teacherRole.id } // Connects relation via unique ID link
+          connect: {
+            id: teacherRole.id,
+          },
+        },
+      },
+      create: {
+        email: normalizedEmail,
+        firstName,
+        lastName,
+        passwordHash,
+        role: {
+          connect: {
+            id: teacherRole.id,
+          },
         },
       },
     });
 
-    // Fallback: If department doesn't exist yet, build its structural requirements safely
+    let targetDept = await prisma.department.findFirst({
+      where: {
+        name: departmentName,
+      },
+    });
+
     if (!targetDept) {
-      // Find any existing college context to prevent foreign key errors
       let primaryCollege = await prisma.college.findFirst();
-      
+
       if (!primaryCollege) {
-        // Creates a placeholder organization tier if the database is blank
         primaryCollege = await prisma.college.create({
           data: {
             name: 'College of Information Technology',
-          }
+            code: 'CIT',
+          },
         });
       }
 
       targetDept = await prisma.department.create({
         data: {
           name: departmentName,
+          code: departmentName
+            .split(' ')
+            .map((word) => word[0])
+            .join('')
+            .toUpperCase(),
           collegeId: primaryCollege.id,
         },
       });
     }
 
-    // 3. ATOMIC TEACHER REGISTRATION
-    // Links everything together inside the final table matrix
+    const existingTeacher = await prisma.teacher.findFirst({
+      where: {
+        userId: targetUser.id,
+      },
+    });
+
+    if (existingTeacher) {
+      return res.status(409).json({
+        success: false,
+        message: 'This user is already registered as an instructor.',
+      });
+    }
+
     const newTeacher = await prisma.teacher.create({
       data: {
         userId: targetUser.id,
@@ -68,39 +130,23 @@ router.post('/', async (req, res) => {
       },
       include: {
         user: true,
-        department: true
-      }
+        department: true,
+      },
     });
 
     return res.status(201).json({
       success: true,
-      message: '🎉 Instructor profile registered successfully!',
-      data: newTeacher
+      message: 'Instructor profile registered successfully.',
+      data: newTeacher,
+      defaultPassword,
     });
-
   } catch (error) {
     console.error('❌ Prisma execution exception caught:', error);
+
     return res.status(500).json({
       success: false,
-      message: `Database Insertion Failure: ${error.message}`
+      message: `Database Insertion Failure: ${error.message}`,
     });
-  }
-});
-
-// GET: Fetch Active Faculty Roster
-// Accessible via: GET http://localhost:5000/api/teachers
-router.get('/', async (req, res) => {
-  try {
-    const teachers = await prisma.teacher.findMany({
-      include: {
-        user: true,
-        department: true,
-      },
-    });
-    return res.json({ success: true, data: teachers });
-  } catch (error) {
-    console.error('❌ Error fetching teacher roster:', error);
-    return res.status(500).json({ success: false, message: error.message });
   }
 });
 

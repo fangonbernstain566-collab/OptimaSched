@@ -6,6 +6,9 @@ import DashboardView from './pages/view/DashboardView'; // Imported and verified
 import ProtectedRoute from './components/ProtectedRoute';
 import Schedules from './pages/Schedules';
 import TeacherManager from './components/TeacherManager'; // Imported and verified path
+import RoomManager from './components/RoomManager'; // Imported and verified path
+import ManageSchedules from './pages/ManageSchedules'; // Imported and verified path
+
 
 export default function App() {
   return (
@@ -40,6 +43,22 @@ export default function App() {
           element={
             <ProtectedRoute allowedRoles={['ADMINISTRATOR']}>
               <TeacherManager />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="rooms" 
+          element={
+            <ProtectedRoute allowedRoles={['ADMINISTRATOR']}>
+              <RoomManager />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="manage-schedules" 
+          element={
+            <ProtectedRoute allowedRoles={['ADMINISTRATOR', 'REGISTRAR_SCHEDULER']}>
+              <ManageSchedules />
             </ProtectedRoute>
           } 
         />
