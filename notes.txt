@@ -1,0 +1,3 @@
+NOTES:
+
+DB CONNECTION IS IN  server/config/prisma.js

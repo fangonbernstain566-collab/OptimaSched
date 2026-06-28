@@ -24,3 +24,7 @@ export const prisma = new PrismaClient({
 });
 
 export default prisma;
+
+
+///Note
+/// This is The DB Connection File. It uses Prisma ORM to Connect to PostgreSQL Database.
