@@ -1,3 +1,4 @@
+// server/prisma/seed.js
 import 'dotenv/config';
 import { prisma } from '../src/config/prisma.js';
 import bcrypt from 'bcrypt';
@@ -5,200 +6,191 @@ import bcrypt from 'bcrypt';
 async function main() {
   console.log('🌱 Starting database seeding...');
 
-  const defaultPassword = 'Password123!';
-  const passwordHash = await bcrypt.hash(defaultPassword, 10);
+  const defaultPassword  = 'Password123!';
+  const passwordHash     = await bcrypt.hash(defaultPassword, 10);
 
-  // 1. Seed roles
-  const roles = [
-    'ADMINISTRATOR',
-    'REGISTRAR_SCHEDULER',
-    'INSTRUCTOR',
-    'STUDENT',
-  ];
-
-  for (const roleName of roles) {
+  // ─── 1. Roles ──────────────────────────────────────────────────────────────
+  console.log('Seeding roles...');
+  const roleNames = ['ADMINISTRATOR', 'REGISTRAR_SCHEDULER', 'INSTRUCTOR', 'STUDENT'];
+  for (const name of roleNames) {
     await prisma.role.upsert({
-      where: { name: roleName },
+      where:  { name },
       update: {},
-      create: { name: roleName },
+      create: { name },
     });
   }
 
-  const instructorRole = await prisma.role.findUnique({
-    where: { name: 'INSTRUCTOR' },
-  });
+  const adminRole      = await prisma.role.findUnique({ where: { name: 'ADMINISTRATOR' } });
+  const instructorRole = await prisma.role.findUnique({ where: { name: 'INSTRUCTOR' } });
 
-  if (!instructorRole) {
-    throw new Error('INSTRUCTOR role was not created.');
+  if (!adminRole || !instructorRole) {
+    throw new Error('Required roles were not created.');
   }
-
   console.log('✅ Roles created/updated');
 
-  // 2. Seed instructor user
-  const instructorUser = await prisma.user.upsert({
-    where: {
-      email: 'hely.ten@pclu.edu.ph',
-    },
-    update: {
-      firstName: 'berns',
-      lastName: 'fangon',
-      roleId: instructorRole.id,
-    },
+  // ─── 2. Admin User ─────────────────────────────────────────────────────────
+  // ✅ FIX: Admin user was completely missing — needed to log in after reset!
+  console.log('Seeding admin user...');
+  await prisma.user.upsert({
+    where:  { email: 'admin@pclu.edu.ph' },
+    update: {},
     create: {
-      email: 'hely.ten@pclu.edu.ph',
-      firstName: 'berns',
-      lastName: 'fangon',
+      email:        'admin@pclu.edu.ph',
+      firstName:    'Aris',
+      lastName:     'Admin',
       passwordHash,
-      role: {
-        connect: {
-          id: instructorRole.id,
-        },
-      },
+      role:         { connect: { id: adminRole.id } },
     },
   });
+  console.log('✅ Admin user created: admin@pclu.edu.ph');
 
-  console.log(`✅ Instructor user created/updated: ${instructorUser.email}`);
+  // ─── 3. Instructor User ────────────────────────────────────────────────────
+  console.log('Seeding instructor user...');
+  const instructorUser = await prisma.user.upsert({
+    where:  { email: 'hely.ten@pclu.edu.ph' },
+    update: { firstName: 'berns', lastName: 'fangon', roleId: instructorRole.id },
+    create: {
+      email:        'hely.ten@pclu.edu.ph',
+      firstName:    'berns',
+      lastName:     'fangon',
+      passwordHash,
+      role:         { connect: { id: instructorRole.id } },
+    },
+  });
+  console.log(`✅ Instructor created: ${instructorUser.email}`);
 
-  // 3. Make sure only this school year is current
+  // ─── 4. College + Department ───────────────────────────────────────────────
+  // ✅ FIX: Missing — required for creating Teacher records
+  console.log('Seeding college and departments...');
+  const college = await prisma.college.upsert({
+    where:  { code: 'CCS' },
+    update: {},
+    create: { name: 'College of Computer Studies', code: 'CCS' },
+  });
+
+  const departments = [
+    { name: 'Computer Science',       code: 'CS'  },
+    { name: 'Information Technology', code: 'IT'  },
+  ];
+  const [csDept] = await Promise.all(
+    departments.map((d) =>
+      prisma.department.upsert({
+        where:  { code: d.code },
+        update: {},
+        create: { ...d, collegeId: college.id },
+      })
+    )
+  );
+  console.log('✅ College and departments created');
+
+  // ─── 5. Teacher record for instructor ──────────────────────────────────────
+  console.log('Seeding teacher record...');
+  const existingTeacher = await prisma.teacher.findUnique({
+    where: { userId: instructorUser.id },
+  });
+  if (!existingTeacher) {
+    await prisma.teacher.create({
+      data: {
+        userId:       instructorUser.id,
+        departmentId: csDept.id,
+        maxTeachingLoad: 21,
+      },
+    });
+  }
+  console.log('✅ Teacher record created');
+
+  // ─── 6. School Year ────────────────────────────────────────────────────────
+  console.log('Seeding school year...');
   await prisma.schoolYear.updateMany({
-    where: {
-      isCurrent: true,
-      name: { not: '2026-2027' },
-    },
-    data: {
-      isCurrent: false,
-    },
+    where: { isCurrent: true, name: { not: '2026-2027' } },
+    data:  { isCurrent: false },
   });
-
   const schoolYear = await prisma.schoolYear.upsert({
-    where: { name: '2026-2027' },
-    update: {
-      isCurrent: true,
-    },
-    create: {
-      name: '2026-2027',
-      isCurrent: true,
-    },
+    where:  { name: '2026-2027' },
+    update: { isCurrent: true },
+    create: { name: '2026-2027', isCurrent: true },
   });
+  console.log(`✅ School Year: ${schoolYear.name}`);
 
-  console.log(`✅ School Year created/updated: ${schoolYear.name}`);
-
-  // 4. Make sure only this semester is current
+  // ─── 7. Semesters ──────────────────────────────────────────────────────────
+  console.log('Seeding semesters...');
   await prisma.semester.updateMany({
-    where: {
-      isCurrent: true,
-      name: { not: '1st Semester' },
-    },
-    data: {
-      isCurrent: false,
-    },
+    where: { isCurrent: true, name: { not: '1st Semester' } },
+    data:  { isCurrent: false },
   });
-
-  let semester = await prisma.semester.findFirst({
-    where: { name: '1st Semester' },
-  });
-
-  if (!semester) {
-    semester = await prisma.semester.create({
-      data: {
-        name: '1st Semester',
-        isCurrent: true,
-      },
-    });
-  } else {
-    semester = await prisma.semester.update({
-      where: { id: semester.id },
-      data: { isCurrent: true },
-    });
+  for (const sem of [
+    { name: '1st Semester', isCurrent: true  },
+    { name: '2nd Semester', isCurrent: false },
+    { name: 'Summer',       isCurrent: false },
+  ]) {
+    const existing = await prisma.semester.findFirst({ where: { name: sem.name } });
+    if (!existing) {
+      await prisma.semester.create({ data: sem });
+    } else {
+      await prisma.semester.update({ where: { id: existing.id }, data: sem });
+    }
   }
+  console.log('✅ Semesters created');
 
-  console.log(`✅ Semester created/updated: ${semester.name}`);
-
-  // 5. Create or update subject
+  // ─── 8. Subject + Offering ─────────────────────────────────────────────────
+  console.log('Seeding subject...');
   const subject = await prisma.subject.upsert({
-    where: { code: 'CS101' },
-    update: {
-      name: 'Intro to Computing',
-      units: 3,
-      isLabRequired: false,
-    },
-    create: {
-      code: 'CS101',
-      name: 'Intro to Computing',
-      units: 3,
-      isLabRequired: false,
-    },
+    where:  { code: 'CS101' },
+    update: { name: 'Intro to Computing', units: 3, isLabRequired: false },
+    create: { code: 'CS101', name: 'Intro to Computing', units: 3, isLabRequired: false },
   });
-
-  console.log(`✅ Subject created/updated: ${subject.code}`);
-
-  // 6. Create offering only if it does not exist
-  let offering = await prisma.subjectOffering.findFirst({
-    where: {
-      subjectId: subject.id,
-    },
+  const offering = await prisma.subjectOffering.findFirst({
+    where: { subjectId: subject.id },
   });
-
   if (!offering) {
-    offering = await prisma.subjectOffering.create({
-      data: {
-        subjectId: subject.id,
-      },
-    });
+    await prisma.subjectOffering.create({ data: { subjectId: subject.id } });
   }
+  console.log(`✅ Subject + Offering ready`);
 
-  console.log(`✅ Subject Offering ready with ID: ${offering.id}`);
-
-  const mainBuilding = await prisma.building.upsert({
-  where: {
-    name: 'Main Building',
-  },
-  update: {},
-  create: {
-    name: 'Main Building',
-  },
-});
-
-const sampleRooms = [
-  {
-    name: 'Room 101',
-    capacity: 40,
-    type: 'LECTURE_ROOM',
-  },
-  {
-    name: 'Computer Lab 1',
-    capacity: 35,
-    type: 'COMPUTER_LABORATORY',
-  },
-  {
-    name: 'Science Lab 1',
-    capacity: 30,
-    type: 'LABORATORY',
-  },
-];
-
-for (const roomData of sampleRooms) {
-  const existingRoom = await prisma.room.findFirst({
-    where: {
-      name: roomData.name,
-      buildingId: mainBuilding.id,
-    },
+  // ─── 9. Building + Rooms ───────────────────────────────────────────────────
+  console.log('Seeding building and rooms...');
+  const building = await prisma.building.upsert({
+    where:  { name: 'Main Building' },
+    update: {},
+    create: { name: 'Main Building' },
   });
+  for (const room of [
+    { name: 'Room 101',       capacity: 40, type: 'LECTURE_ROOM'        },
+    { name: 'Computer Lab 1', capacity: 35, type: 'COMPUTER_LABORATORY' },
+    { name: 'Science Lab 1',  capacity: 30, type: 'LABORATORY'          },
+  ]) {
+    const exists = await prisma.room.findFirst({
+      where: { name: room.name, buildingId: building.id },
+    });
+    if (!exists) {
+      await prisma.room.create({ data: { ...room, buildingId: building.id } });
+    }
+  }
+  console.log('✅ Building and rooms created');
 
-  if (!existingRoom) {
-    await prisma.room.create({
-      data: {
-        ...roomData,
-        buildingId: mainBuilding.id,
-      },
+  // ─── 10. Sections ──────────────────────────────────────────────────────────
+  console.log('Seeding sections...');
+  for (const name of [
+    'BSCS-1A', 'BSCS-1B', 'BSCS-1C',
+    'BSCS-2A', 'BSCS-2B', 'BSCS-2C',
+    'BSCS-3A', 'BSCS-3B', 'BSCS-3C',
+    'BSCS-4A', 'BSCS-4B', 'BSCS-4C',
+    'BSIT-1A', 'BSIT-1B',
+    'BSIT-2A', 'BSIT-2B',
+    'BSIT-3A', 'BSIT-3B',
+    'BSIT-4A', 'BSIT-4B',
+  ]) {
+    await prisma.section.upsert({
+      where:  { name },
+      update: {},
+      create: { name },
     });
   }
-}
+  console.log('✅ Sections created');
 
-console.log('✅ Sample rooms created/verified');
-
+  // ✅ FIX: These lines are now INSIDE main() where defaultPassword is in scope
   console.log('✨ Seeding completed successfully!');
-  console.log(`🔑 Default instructor password: ${defaultPassword}`);
+  console.log(`🔑 Default password for all users: ${defaultPassword}`);
 }
 
 main()

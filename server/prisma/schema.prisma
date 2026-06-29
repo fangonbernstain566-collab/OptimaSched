@@ -135,6 +135,7 @@ model Schedule {
   dayOfWeek         String
   startTime         String
   endTime           String
+  studentCount      Int             @default(0)
   status            ScheduleStatus  @default(PENDING)
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt

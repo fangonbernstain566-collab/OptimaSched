@@ -29,6 +29,8 @@ export default function DashboardLayout() {
     { text: 'Manage Teachers', path: '/teachers', icon: <AdminIcon />, roles: ['ADMINISTRATOR', 'REGISTRAR_SCHEDULER'] },
     { text: 'Manage Rooms', path: '/rooms', icon: <AdminIcon />, roles: ['ADMINISTRATOR'] },
     { text: 'Manage Schedules (Advanced)', path: '/manage-schedules', icon: <SchedIcon />, roles: ['ADMINISTRATOR', 'REGISTRAR_SCHEDULER'] },
+    { text: 'Schedule Plotter', path: '/schedules/plotter', icon: <SchedIcon />, roles: ['ADMINISTRATOR', 'REGISTRAR_SCHEDULER'] }, 
+  
   ];
 
   const drawerContent = (
