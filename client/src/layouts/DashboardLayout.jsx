@@ -28,7 +28,6 @@ export default function DashboardLayout() {
     // ADDED: Navigation configuration for the new Teacher/Faculty view
     { text: 'Manage Teachers', path: '/teachers', icon: <AdminIcon />, roles: ['ADMINISTRATOR', 'REGISTRAR_SCHEDULER'] },
     { text: 'Manage Rooms', path: '/rooms', icon: <AdminIcon />, roles: ['ADMINISTRATOR'] },
-    { text: 'Manage Schedules (Advanced)', path: '/manage-schedules', icon: <SchedIcon />, roles: ['ADMINISTRATOR', 'REGISTRAR_SCHEDULER'] },
     { text: 'Schedule Plotter', path: '/schedules/plotter', icon: <SchedIcon />, roles: ['ADMINISTRATOR', 'REGISTRAR_SCHEDULER'] }, 
   
   ];

@@ -171,14 +171,10 @@ async function main() {
   // ─── 10. Sections ──────────────────────────────────────────────────────────
   console.log('Seeding sections...');
   for (const name of [
-    'BSCS-1A', 'BSCS-1B', 'BSCS-1C',
-    'BSCS-2A', 'BSCS-2B', 'BSCS-2C',
-    'BSCS-3A', 'BSCS-3B', 'BSCS-3C',
-    'BSCS-4A', 'BSCS-4B', 'BSCS-4C',
-    'BSIT-1A', 'BSIT-1B',
-    'BSIT-2A', 'BSIT-2B',
-    'BSIT-3A', 'BSIT-3B',
-    'BSIT-4A', 'BSIT-4B',
+    'BSIT-A1', 'BSIT-A2', 'BSIT-A3', 'BSIT-A4',
+    'BSIT-B1', 'BSIT-B2',
+    'BSIT-C1', 'BSIT-C2',
+    'BSIT-D1', 'BSIT-D2',
   ]) {
     await prisma.section.upsert({
       where:  { name },
