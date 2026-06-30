@@ -25,18 +25,16 @@ export default function DashboardLayout() {
   const navigationItems = [
     { text: 'Dashboard View', path: '/dashboard', icon: <DashIcon />, roles: ['ADMINISTRATOR', 'REGISTRAR_SCHEDULER', 'INSTRUCTOR', 'STUDENT'] },
     { text: 'Manage Schedules', path: '/schedules', icon: <SchedIcon />, roles: ['ADMINISTRATOR', 'REGISTRAR_SCHEDULER'] },
-    // ADDED: Navigation configuration for the new Teacher/Faculty view
+    { text: 'Schedule Plotter', path: '/schedules/plotter', icon: <SchedIcon />, roles: ['ADMINISTRATOR', 'REGISTRAR_SCHEDULER'] }, 
     { text: 'Manage Teachers', path: '/teachers', icon: <AdminIcon />, roles: ['ADMINISTRATOR', 'REGISTRAR_SCHEDULER'] },
     { text: 'Manage Rooms', path: '/rooms', icon: <AdminIcon />, roles: ['ADMINISTRATOR'] },
-    { text: 'Schedule Plotter', path: '/schedules/plotter', icon: <SchedIcon />, roles: ['ADMINISTRATOR', 'REGISTRAR_SCHEDULER'] }, 
-  
   ];
 
   const drawerContent = (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <Toolbar sx={{ bgcolor: 'primary.main', color: 'white' }}>
         <Typography variant="h6" fontWeight="bold" noWrap>
-          OptimaSched UI
+          OptimaSched
         </Typography>
       </Toolbar>
       <Divider />

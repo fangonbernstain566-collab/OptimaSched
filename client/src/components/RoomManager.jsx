@@ -16,20 +16,13 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
+import { useToast } from '../hooks/useToast';
+import Toast from '../components/Toast';
 
 const ROOM_TYPES = [
-  {
-    value: 'LECTURE_ROOM',
-    label: 'Lecture Room',
-  },
-  {
-    value: 'COMPUTER_LABORATORY',
-    label: 'Computer Laboratory',
-  },
-  {
-    value: 'LABORATORY',
-    label: 'Laboratory',
-  },
+  { value: 'LECTURE_ROOM',          label: 'Lecture Room' },
+  { value: 'COMPUTER_LABORATORY',   label: 'Computer Laboratory' },
+  { value: 'LABORATORY',            label: 'Laboratory' },
 ];
 
 export default function RoomManager() {
@@ -43,16 +36,23 @@ export default function RoomManager() {
     buildingName: 'Main Building',
   });
 
+  const { toast, showToast, hideToast } = useToast();
+
+  // ✅ FIX: was reading localStorage key 'token' — actual key is 'optimasched_token'
+  const getAuthHeaders = () => {
+    const token = localStorage.getItem('optimasched_token');
+    return token ? { headers: { Authorization: `Bearer ${token}` } } : {};
+  };
+
   const fetchRooms = async () => {
     try {
-      const response = await axios.get('/api/rooms');
+      const response = await axios.get('/api/rooms', getAuthHeaders());
 
       if (response.data.success) {
         setRooms(response.data.data || []);
       }
     } catch (error) {
-      console.error('Error fetching rooms:', error);
-      alert(error.response?.data?.message || 'Failed to fetch rooms.');
+      showToast(error.response?.data?.message ?? 'Failed to fetch rooms.', 'error');
     }
   };
 
@@ -62,21 +62,17 @@ export default function RoomManager() {
 
   const handleChange = (event) => {
     const { name, value } = event.target;
-
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
 
     try {
-      const response = await axios.post('/api/rooms', formData);
+      const response = await axios.post('/api/rooms', formData, getAuthHeaders());
 
       if (response.data.success) {
-        alert(response.data.message || 'Room created successfully.');
+        showToast(response.data.message ?? 'Room created successfully.', 'success');
         setOpen(false);
 
         setFormData({
@@ -89,8 +85,7 @@ export default function RoomManager() {
         fetchRooms();
       }
     } catch (error) {
-      console.error('Error creating room:', error);
-      alert(error.response?.data?.message || 'Failed to create room.');
+      showToast(error.response?.data?.message ?? 'Failed to create room.', 'error');
     }
   };
 
@@ -102,20 +97,21 @@ export default function RoomManager() {
     if (!confirmDelete) return;
 
     try {
-      const response = await axios.delete(`/api/rooms/${roomId}`);
+      const response = await axios.delete(`/api/rooms/${roomId}`, getAuthHeaders());
 
       if (response.data.success) {
-        alert(response.data.message || 'Room deleted successfully.');
+        showToast(response.data.message ?? 'Room deleted successfully.', 'success');
         fetchRooms();
       }
     } catch (error) {
-      console.error('Error deleting room:', error);
-      alert(error.response?.data?.message || 'Failed to delete room.');
+      showToast(error.response?.data?.message ?? 'Failed to delete room.', 'error');
     }
   };
 
   return (
     <Box>
+      <Toast toast={toast} onClose={hideToast} />
+
       <Stack
         direction="row"
         justifyContent="space-between"
@@ -131,10 +127,7 @@ export default function RoomManager() {
           </Typography>
         </Box>
 
-        <Button
-          variant="contained"
-          onClick={() => setOpen(true)}
-        >
+        <Button variant="contained" onClick={() => setOpen(true)}>
           + Add Room
         </Button>
       </Stack>
