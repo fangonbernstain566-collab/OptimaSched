@@ -124,9 +124,6 @@ const PlotterCell = ({ id, roomId, timeSlot, day, room, isOccupied, occupant, dr
           <Typography variant="caption" fontWeight="700" color="error.main" display="block" noWrap>
             {occupant?.subjectOffering?.subject?.name ?? 'Occupied'}
           </Typography>
-          <Typography variant="caption" color="error.light" noWrap>
-            {occupant?.teacher?.user?.firstName ?? ''}
-          </Typography>
         </Box>
       ) : isOver ? (
         <Typography variant="caption" fontWeight="700"
