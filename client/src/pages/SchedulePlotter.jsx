@@ -8,6 +8,7 @@ import { CSS } from '@dnd-kit/utilities';
 import {
   Box, Typography, Paper, Chip, Tab, Tabs,
   CircularProgress, Button, Modal, Stack, Divider,
+  Tooltip,
 } from '@mui/material';
 import {
   DragIndicator as DragIcon,
@@ -17,11 +18,9 @@ import {
 import { useToast } from '../hooks/useToast';
 import Toast from '../components/Toast';
 
-// ─── Constants ────────────────────────────────────────────────────────────────
 const DAYS       = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 const TIME_SLOTS = ['07:30', '09:00', '10:30', '12:00', '13:30', '15:00', '16:30'];
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 const addMinutes = (time, mins) => {
   const [h, m] = time.split(':').map(Number);
   const total  = h * 60 + m + mins;
@@ -31,7 +30,32 @@ const addMinutes = (time, mins) => {
 const getOccupant = (slots, roomId, day, timeSlot) =>
   slots.find((s) => s.roomId === roomId && s.dayOfWeek === day && s.startTime === timeSlot);
 
-// ─── Draggable Card ───────────────────────────────────────────────────────────
+const buildTooltip = (occupant) => {
+  if (!occupant) return '';
+
+  const teacherName = occupant.teacher?.user
+    ? `${occupant.teacher.user.firstName} ${occupant.teacher.user.lastName}`
+    : 'Unassigned';
+
+  return (
+    <Box sx={{ p: 0.5 }}>
+      <Typography variant="subtitle2" fontWeight="700" sx={{ mb: 0.75 }}>
+        {occupant.subjectOffering?.subject?.name ?? 'Unknown Subject'}
+      </Typography>
+      <Stack spacing={0.4}>
+        <Typography variant="caption" display="block">👤 {teacherName}</Typography>
+        <Typography variant="caption" display="block">🏷 Section: {occupant.section?.name ?? '—'}</Typography>
+        <Typography variant="caption" display="block">👥 Students: {occupant.studentCount ?? 0}</Typography>
+        <Typography variant="caption" display="block">⏰ {occupant.startTime} – {occupant.endTime}</Typography>
+        <Typography variant="caption" display="block">
+          📅 {occupant.schoolYear?.name ?? '—'} · {occupant.semester?.name ?? '—'}
+        </Typography>
+        <Typography variant="caption" display="block">📌 Status: {occupant.status}</Typography>
+      </Stack>
+    </Box>
+  );
+};
+
 const PendingCard = ({ schedule }) => {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: schedule.id,
@@ -81,7 +105,6 @@ const PendingCard = ({ schedule }) => {
   );
 };
 
-// ─── Droppable Cell ───────────────────────────────────────────────────────────
 const PlotterCell = ({ id, roomId, timeSlot, day, room, isOccupied, occupant, draggingCount }) => {
   const { setNodeRef, isOver } = useDroppable({
     id,
@@ -107,7 +130,7 @@ const PlotterCell = ({ id, roomId, timeSlot, day, room, isOccupied, occupant, dr
     ? '#fcd34d'
     : '#e2e8f0';
 
-  return (
+  const cellContent = (
     <Box
       ref={setNodeRef}
       sx={{
@@ -116,7 +139,7 @@ const PlotterCell = ({ id, roomId, timeSlot, day, room, isOccupied, occupant, dr
         bgcolor: bg, display: 'flex',
         alignItems: 'center', justifyContent: 'center',
         transition: 'all .15s ease', p: 0.75,
-        cursor: isOccupied ? 'not-allowed' : 'default',
+        cursor: isOccupied ? 'pointer' : 'default',
       }}
     >
       {isOccupied ? (
@@ -137,9 +160,27 @@ const PlotterCell = ({ id, roomId, timeSlot, day, room, isOccupied, occupant, dr
       )}
     </Box>
   );
+
+  return isOccupied ? (
+    <Tooltip
+      title={buildTooltip(occupant)}
+      arrow
+      placement="top"
+      componentsProps={{
+        tooltip: {
+          sx: {
+            bgcolor: '#1e293b',
+            maxWidth: 260,
+            '& .MuiTooltip-arrow': { color: '#1e293b' },
+          },
+        },
+      }}
+    >
+      {cellContent}
+    </Tooltip>
+  ) : cellContent;
 };
 
-// ─── Main Component ───────────────────────────────────────────────────────────
 const SchedulePlotter = () => {
   const [pending, setPending]         = useState([]);
   const [scheduled, setScheduled]     = useState([]);
@@ -155,12 +196,12 @@ const SchedulePlotter = () => {
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
   );
 
+  // ✅ FIX: was reading localStorage key 'token' — actual key is 'optimasched_token'
   const getAuthHeaders = () => {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('optimasched_token');
     return token ? { headers: { Authorization: `Bearer ${token}` } } : {};
   };
 
-  // ─── Fetch ──────────────────────────────────────────────────────────────────
   const fetchData = async () => {
     setLoading(true);
     try {
@@ -183,7 +224,6 @@ const SchedulePlotter = () => {
 
   useEffect(() => { fetchData(); }, []);
 
-  // ─── DnD Handlers ───────────────────────────────────────────────────────────
   const handleDragStart = ({ active }) => {
     setActiveSched(pending.find((s) => s.id === active.id) ?? null);
   };
@@ -216,7 +256,6 @@ const SchedulePlotter = () => {
     });
   };
 
-  // ─── Confirm Placement ───────────────────────────────────────────────────────
   const handleConfirm = async () => {
     if (!confirm) return;
     try {
@@ -246,21 +285,19 @@ const SchedulePlotter = () => {
     }
   };
 
-  // ─── Render ──────────────────────────────────────────────────────────────────
   return (
     <Box sx={{ p: 4, minHeight: '100vh', bgcolor: '#f8fafc', mt: -4, mx: -4 }}>
       <Toast toast={toast} onClose={hideToast} />
 
       <Box sx={{ maxWidth: '1500px', mx: 'auto' }}>
 
-        {/* Header */}
         <Box sx={{ mb: 4 }}>
           <Typography variant="h4" fontWeight="800" sx={{ color: '#1e293b' }}>
             Schedule Plotter
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
             Drag a pending schedule card onto an available room slot to assign it.
-            🟢 = Valid drop &nbsp;|&nbsp; 🟡 = Over capacity &nbsp;|&nbsp; 🔴 = Occupied
+            🟢 = Valid drop &nbsp;|&nbsp; 🟡 = Over capacity &nbsp;|&nbsp; 🔴 = Occupied (hover for details)
           </Typography>
         </Box>
 
@@ -277,7 +314,6 @@ const SchedulePlotter = () => {
           >
             <Box sx={{ display: 'flex', gap: 3, alignItems: 'flex-start' }}>
 
-              {/* ── Pending Queue ─────────────────────────────────────────── */}
               <Box sx={{ width: 250, flexShrink: 0 }}>
                 <Paper sx={{ p: 2, borderRadius: '16px', position: 'sticky', top: 24, maxHeight: '80vh', overflowY: 'auto' }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
@@ -305,14 +341,13 @@ const SchedulePlotter = () => {
                   )}
                 </Paper>
 
-                {/* Legend */}
                 <Paper sx={{ p: 2, borderRadius: '16px', mt: 2 }}>
                   <Typography variant="caption" fontWeight="700" display="block" sx={{ mb: 1.5 }}>
                     Legend
                   </Typography>
                   {[
                     { bg: '#f8fafc',  border: '#e2e8f0', label: 'Available' },
-                    { bg: '#fee2e2',  border: '#fca5a5', label: 'Occupied' },
+                    { bg: '#fee2e2',  border: '#fca5a5', label: 'Occupied (hover for details)' },
                     { bg: '#dcfce7',  border: '#86efac', label: 'Valid drop target' },
                     { bg: '#fef3c7',  border: '#fcd34d', label: 'Over capacity' },
                   ].map(({ bg, border, label }) => (
@@ -324,10 +359,8 @@ const SchedulePlotter = () => {
                 </Paper>
               </Box>
 
-              {/* ── Plotter Grid ──────────────────────────────────────────── */}
               <Box sx={{ flex: 1, minWidth: 0 }}>
 
-                {/* Day Tabs */}
                 <Paper sx={{ borderRadius: '12px', mb: 2 }}>
                   <Tabs
                     value={selectedDay}
@@ -356,7 +389,6 @@ const SchedulePlotter = () => {
                   </Tabs>
                 </Paper>
 
-                {/* Grid */}
                 <Paper sx={{ p: 2, borderRadius: '16px', overflowX: 'auto' }}>
                   {rooms.length === 0 ? (
                     <Box sx={{ textAlign: 'center', py: 6 }}>
@@ -370,7 +402,6 @@ const SchedulePlotter = () => {
                       minWidth: 900,
                     }}>
 
-                      {/* Column headers */}
                       <Box />
                       {TIME_SLOTS.map((t) => (
                         <Box key={t} sx={{ textAlign: 'center', pb: 0.5 }}>
@@ -380,11 +411,9 @@ const SchedulePlotter = () => {
                         </Box>
                       ))}
 
-                      {/* Room rows */}
                       {rooms.map((room) => (
                         <React.Fragment key={room.id}>
 
-                          {/* Room info label */}
                           <Box sx={{
                             display: 'flex', flexDirection: 'column',
                             justifyContent: 'center', pr: 1.5,
@@ -401,7 +430,6 @@ const SchedulePlotter = () => {
                               size="small"
                               sx={{ fontSize: '0.6rem', height: 16, mt: 0.5, maxWidth: 140 }}
                             />
-                            {/* Capacity warning */}
                             {activeSched && room.capacity < (activeSched.studentCount ?? 0) && (
                               <Typography variant="caption" color="warning.main" fontWeight="700" sx={{ mt: 0.25 }}>
                                 ⚠ Too small
@@ -409,7 +437,6 @@ const SchedulePlotter = () => {
                             )}
                           </Box>
 
-                          {/* Time slot cells */}
                           {TIME_SLOTS.map((timeSlot) => {
                             const occupant = getOccupant(scheduled, room.id, selectedDay, timeSlot);
                             return (
@@ -437,7 +464,6 @@ const SchedulePlotter = () => {
               </Box>
             </Box>
 
-            {/* Drag Overlay — follows cursor */}
             <DragOverlay dropAnimation={null}>
               {activeSched ? (
                 <Paper elevation={10} sx={{
@@ -457,7 +483,6 @@ const SchedulePlotter = () => {
           </DndContext>
         )}
 
-        {/* ── Confirm Placement Modal ──────────────────────────────────────── */}
         <Modal
           open={!!confirm}
           onClose={() => setConfirm(null)}

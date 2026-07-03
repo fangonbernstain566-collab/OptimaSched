@@ -1,5 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { useToast } from '../hooks/useToast';
+import Toast from '../components/Toast';
+import { Box, Typography, Button } from '@mui/material'; 
+import { Add as AddIcon } from '@mui/icons-material'; 
 
 export default function TeacherManager() {
   const [teachers, setTeachers] = useState([]);
@@ -10,8 +14,17 @@ export default function TeacherManager() {
     lastName: '',
     email: '',
     maxTeachingLoad: 15,
-    departmentName: 'Information Technology Dept' // Auto fallback string
+    departmentName: 'Information Technology Dept'
   });
+
+  const { toast, showToast, hideToast } = useToast();
+
+  // ✅ FIX: this function didn't exist at all before — every request was sent
+  // with zero auth headers
+  const getAuthHeaders = () => {
+    const token = localStorage.getItem('optimasched_token');
+    return token ? { headers: { Authorization: `Bearer ${token}` } } : {};
+  };
 
   useEffect(() => {
     fetchTeachers();
@@ -20,12 +33,15 @@ export default function TeacherManager() {
   const fetchTeachers = async () => {
     try {
       setLoading(true);
-      const response = await axios.get('/api/teachers');
+      const response = await axios.get('/api/teachers', getAuthHeaders());
       if (response.data.success) {
         setTeachers(response.data.data);
       }
     } catch (error) {
-      console.error("Error fetching instructor data:", error);
+      showToast(
+        error.response?.data?.message ?? 'Failed to load instructor roster.',
+        'error'
+      );
     } finally {
       setLoading(false);
     }
@@ -33,22 +49,24 @@ export default function TeacherManager() {
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const response = await axios.post('/api/teachers', formData);
+      const response = await axios.post('/api/teachers', formData, getAuthHeaders());
       if (response.data.success) {
-        alert('🎉 Instructor profile registered successfully!');
+        showToast(response.data.message ?? 'Instructor registered successfully!', 'success');
         setIsModalOpen(false);
-        // Reset Form
-        setFormData({ firstName: '', lastName: '', email: '', maxTeachingLoad: 15, departmentName: 'Information Technology Dept' });
+        setFormData({
+          firstName: '', lastName: '', email: '',
+          maxTeachingLoad: 15, departmentName: 'Information Technology Dept',
+        });
         fetchTeachers();
       }
     } catch (error) {
-      alert(error.response?.data?.message || 'Failed to save instructor profile.');
+      showToast(error.response?.data?.message ?? 'Failed to save instructor profile.', 'error');
     }
   };
 
@@ -56,14 +74,23 @@ export default function TeacherManager() {
 
   return (
     <div style={{ padding: '24px', fontFamily: 'sans-serif' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-        <h2>OptimaSched Faculty Roster Directory</h2>
-        <button onClick={() => setIsModalOpen(true)} style={{ padding: '10px 16px', background: '#0070f3', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
-          + Register New Teacher
-        </button>
-      </div>
 
-      {/* Roster Table Layout */}
+      <Toast toast={toast} onClose={hideToast} />
+
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+  <Typography variant="h4" fontWeight={800} sx={{ color: '#1e293b' }}>
+    OptimaSched Faculty Roster Directory
+  </Typography>
+  <Button
+    variant="contained"
+    startIcon={<AddIcon />}
+    onClick={() => setIsModalOpen(true)}
+    sx={{ bgcolor: '#2563eb', borderRadius: '12px', textTransform: 'none' }}
+  >
+    Register New Teacher
+  </Button>
+</Box>
+
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
         <thead>
           <tr style={{ background: '#f5f5f5', textAlign: 'left', borderBottom: '2px solid #ddd' }}>
@@ -76,7 +103,9 @@ export default function TeacherManager() {
         <tbody>
           {teachers.length === 0 ? (
             <tr>
-              <td colSpan="4" style={{ padding: '20px', textAlign: 'center', color: '#666' }}>No active instructors registered in the database system yet.</td>
+              <td colSpan="4" style={{ padding: '20px', textAlign: 'center', color: '#666' }}>
+                No active instructors registered in the database system yet.
+              </td>
             </tr>
           ) : (
             teachers.map((t) => (
@@ -91,12 +120,11 @@ export default function TeacherManager() {
         </tbody>
       </table>
 
-      {/* Entry Modal Overlay Form */}
       {isModalOpen && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
           <form onSubmit={handleSubmit} style={{ background: '#fff', padding: '30px', borderRadius: '8px', width: '400px' }}>
             <h3>Onboard New Academic Faculty</h3>
-            
+
             <div style={{ marginBottom: '12px' }}>
               <label style={{ display: 'block', marginBottom: '4px' }}>First Name</label>
               <input type="text" name="firstName" value={formData.firstName} onChange={handleInputChange} style={{ width: '100%', padding: '8px' }} required />

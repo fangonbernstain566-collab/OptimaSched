@@ -1,8 +1,11 @@
 // src/routes/schedule.routes.js
 import { Router } from 'express';
 import prisma from '../config/prisma.js';
+import { authenticate } from '../middleware/auth.js';
+import { logAudit } from '../utils/auditLog.js';
 
 const router = Router();
+router.use(authenticate); // ✅ makes req.user available to every route below
 
 // ─── Helper: safely extract value from allSettled result ──────────────────────
 const safeResult = (result) => {
@@ -86,7 +89,7 @@ router.post('/', async (req, res) => {
     const {
       teacherId, roomId, sectionId, subjectOfferingId,
       schoolYearId, semesterId, dayOfWeek, startTime, endTime,
-      studentCount,  // ✅ NEW
+      studentCount,
     } = req.body;
 
     const requiredFields = {
@@ -105,15 +108,23 @@ router.post('/', async (req, res) => {
       });
     }
 
+    // ✅ FIX: create happens FIRST, only once, before anything references it
     const newSchedule = await prisma.schedule.create({
       data: {
         teacherId, roomId, sectionId, subjectOfferingId,
         schoolYearId, semesterId, dayOfWeek, startTime, endTime,
-        studentCount: Number(studentCount) || 0,  // ✅ NEW
+        studentCount: Number(studentCount) || 0,
         status: 'PENDING',
-      }
+      },
+      include: { subjectOffering: { include: { subject: true } } },
     });
 
+    // ✅ Audit log fires after the real record exists
+    await logAudit(req, `${req.user.firstName} created a new schedule (pending placement)`, {
+      entityType: 'Schedule', entityId: newSchedule.id,
+    });
+
+    // ✅ Single return, at the end
     return res.json({ success: true, message: 'Schedule request created!', data: newSchedule });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
@@ -177,7 +188,7 @@ router.put('/:id', async (req, res) => {
     const {
       teacherId, roomId, sectionId, subjectOfferingId,
       schoolYearId, semesterId, dayOfWeek, startTime, endTime,
-      studentCount,  // ✅ NEW
+      studentCount,
       status,
     } = req.body;
 
@@ -202,7 +213,7 @@ router.put('/:id', async (req, res) => {
       data: {
         teacherId, roomId, sectionId, subjectOfferingId,
         schoolYearId, semesterId, dayOfWeek, startTime, endTime,
-        studentCount: Number(studentCount) || 0,  // ✅ NEW
+        studentCount: Number(studentCount) || 0,
         ...(status && { status }),
       },
       include: {
@@ -215,6 +226,11 @@ router.put('/:id', async (req, res) => {
       }
     });
 
+    // ✅ NEW: audit log for updates
+    await logAudit(req, `${req.user.firstName} updated the ${updated.subjectOffering?.subject?.name ?? 'class'} schedule`, {
+      entityType: 'Schedule', entityId: updated.id,
+    });
+
     return res.json({ success: true, message: 'Schedule updated successfully!', data: updated });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
@@ -225,8 +241,75 @@ router.put('/:id', async (req, res) => {
 router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
+
+    // ✅ NEW: capture the name BEFORE deleting, since it won't exist afterward
+    const target = await prisma.schedule.findUnique({
+      where: { id },
+      include: { subjectOffering: { include: { subject: true } } },
+    });
+
     await prisma.schedule.delete({ where: { id } });
+
+    await logAudit(req, `${req.user.firstName} deleted the ${target?.subjectOffering?.subject?.name ?? 'a'} schedule`, {
+      entityType: 'Schedule', entityId: id,
+    });
+
     return res.json({ success: true, message: 'Schedule deleted successfully!' });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// ─── 9. POST /check-room-conflict: Soft room-conflict check ──────────────────
+router.post('/check-room-conflict', async (req, res) => {
+  try {
+    const { roomId, dayOfWeek, startTime, endTime, excludeId } = req.body;
+
+    if (!roomId || !dayOfWeek || !startTime || !endTime) {
+      return res.json({ success: true, hasConflict: false, conflict: null });
+    }
+
+    const conflict = await prisma.schedule.findFirst({
+      where: {
+        roomId,
+        dayOfWeek,
+        status: { not: 'ARCHIVED' },
+        ...(excludeId && { id: { not: excludeId } }),
+        startTime: { lt: endTime },
+        endTime:   { gt: startTime },
+      },
+      include: {
+        subjectOffering: { include: { subject: true } },
+        teacher:          { include: { user: true } },
+      },
+    });
+
+    return res.json({ success: true, hasConflict: !!conflict, conflict });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// ─── 10. PUT /:id/students: Save the lightweight student roster ─────────────
+router.put('/:id/students', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { names } = req.body;
+
+    if (!Array.isArray(names)) {
+      return res.status(400).json({ success: false, message: '"names" must be an array of strings.' });
+    }
+
+    const cleaned = names
+      .map((n) => String(n).trim())
+      .filter((n) => n.length > 0);
+
+    const updated = await prisma.schedule.update({
+      where: { id },
+      data: { enrolledStudents: cleaned },
+    });
+
+    return res.json({ success: true, data: updated.enrolledStudents });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
   }

@@ -134,6 +134,7 @@ model Schedule {
   semesterId        String
   dayOfWeek         String
   startTime         String
+  enrolledStudents String[] @default([])
   endTime           String
   studentCount      Int             @default(0)
   status            ScheduleStatus  @default(PENDING)
