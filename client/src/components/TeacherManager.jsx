@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useToast } from '../hooks/useToast';
 import Toast from '../components/Toast';
+import { Box, Typography, Button } from '@mui/material'; 
+import { Add as AddIcon } from '@mui/icons-material'; 
 
 export default function TeacherManager() {
   const [teachers, setTeachers] = useState([]);
@@ -75,12 +77,19 @@ export default function TeacherManager() {
 
       <Toast toast={toast} onClose={hideToast} />
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-        <h2>OptimaSched Faculty Roster Directory</h2>
-        <button onClick={() => setIsModalOpen(true)} style={{ padding: '10px 16px', background: '#0070f3', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
-          + Register New Teacher
-        </button>
-      </div>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+  <Typography variant="h4" fontWeight={800} sx={{ color: '#1e293b' }}>
+    OptimaSched Faculty Roster Directory
+  </Typography>
+  <Button
+    variant="contained"
+    startIcon={<AddIcon />}
+    onClick={() => setIsModalOpen(true)}
+    sx={{ bgcolor: '#2563eb', borderRadius: '12px', textTransform: 'none' }}
+  >
+    Register New Teacher
+  </Button>
+</Box>
 
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
         <thead>
