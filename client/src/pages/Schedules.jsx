@@ -3,7 +3,7 @@ import axios from 'axios';
 import {
   Box, Typography, Button, Paper, Table, TableBody, TableCell,
   TableHead, TableRow, Modal, TextField, MenuItem, Stack,
-  CircularProgress, IconButton, Chip, Tooltip, Divider,
+  CircularProgress, IconButton, Chip, Tooltip, Divider, Alert,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -12,6 +12,7 @@ import {
 } from '@mui/icons-material';
 import { useToast } from '../hooks/useToast';
 import Toast from '../components/Toast';
+import ClassDetailsModal from '../components/ClassDetailsModal';
 
 const DAYS      = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 const TIME_SLOTS = ['07:30', '09:00', '10:30', '12:00', '13:30', '15:00', '16:30'];
@@ -28,7 +29,7 @@ const INITIAL_FORM = {
   teacherId: '', roomId: '', sectionId: '', subjectOfferingId: '',
   schoolYearId: '', semesterId: '', dayOfWeek: 'Monday',
   startTime: '', endTime: '',
-  studentCount: '',   // ✅ NEW
+  studentCount: '',
 };
 
 const Schedules = () => {
@@ -44,11 +45,17 @@ const Schedules = () => {
   const [deleteId, setDeleteId]     = useState(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
 
+  const [roomConflict, setRoomConflict] = useState(null);
+  const [detailTarget, setDetailTarget] = useState(null);
+
   const { toast, showToast, hideToast } = useToast();
 
   // ─── Auth Helper ──────────────────────────────────────────────────────────
+  // ✅ FIX: was reading localStorage key 'token' — AuthContext.jsx actually
+  // stores it under 'optimasched_token'. This mismatch silently sent zero
+  // Authorization headers everywhere until the backend started requiring auth.
   const getAuthHeaders = () => {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('optimasched_token');
     return token ? { headers: { Authorization: `Bearer ${token}` } } : {};
   };
 
@@ -81,6 +88,26 @@ const Schedules = () => {
 
   useEffect(() => { fetchData(); }, []);
 
+  // Real-time room conflict check — runs instantly against in-memory `schedules`
+  useEffect(() => {
+    const { roomId, dayOfWeek, startTime, endTime } = formData;
+
+    if (!roomId || !dayOfWeek || !startTime || !endTime) {
+      setRoomConflict(null);
+      return;
+    }
+
+    const found = schedules.find((s) =>
+      s.roomId === roomId &&
+      s.dayOfWeek === dayOfWeek &&
+      s.id !== (editTarget?.id ?? null) &&
+      s.status !== 'ARCHIVED' &&
+      startTime < s.endTime && endTime > s.startTime
+    );
+
+    setRoomConflict(found ?? null);
+  }, [formData.roomId, formData.dayOfWeek, formData.startTime, formData.endTime, schedules, editTarget]);
+
   // ─── Form Helpers ─────────────────────────────────────────────────────────
   const handleChange = (field) => (e) =>
     setFormData((prev) => ({ ...prev, [field]: e.target.value }));
@@ -88,6 +115,7 @@ const Schedules = () => {
   const openCreate = () => {
     setEditTarget(null);
     setFormData(INITIAL_FORM);
+    setRoomConflict(null);
     setOpen(true);
   };
 
@@ -103,7 +131,7 @@ const Schedules = () => {
       dayOfWeek:         schedule.dayOfWeek,
       startTime:         schedule.startTime,
       endTime:           schedule.endTime,
-      studentCount:      schedule.studentCount ?? '',   // ✅ NEW
+      studentCount:      schedule.studentCount ?? '',
       status:            schedule.status,
     });
     setOpen(true);
@@ -113,6 +141,7 @@ const Schedules = () => {
     setOpen(false);
     setEditTarget(null);
     setFormData(INITIAL_FORM);
+    setRoomConflict(null);
   };
 
   // ─── Validate Form ────────────────────────────────────────────────────────
@@ -133,9 +162,31 @@ const Schedules = () => {
     return true;
   };
 
+  // Authoritative conflict check against the live database — runs right before save.
+  const checkConflictOnSubmit = async () => {
+    try {
+      const config = getAuthHeaders();
+      const res = await axios.post('/api/schedules/check-room-conflict', {
+        roomId:     formData.roomId,
+        dayOfWeek:  formData.dayOfWeek,
+        startTime:  formData.startTime,
+        endTime:    formData.endTime,
+        excludeId:  editTarget?.id ?? null,
+      }, config);
+
+      if (res.data.hasConflict) {
+        const conflictSubject = res.data.conflict?.subjectOffering?.subject?.name ?? 'another class';
+        showToast(`Heads up: room is double-booked with "${conflictSubject}" — saved anyway.`, 'warning');
+      }
+    } catch {
+      // Soft check — a failed conflict lookup should never block saving
+    }
+  };
+
   // ─── Create ───────────────────────────────────────────────────────────────
   const handleCreate = async () => {
     if (!validateForm()) return;
+    await checkConflictOnSubmit();
     try {
       const config = getAuthHeaders();
       const res = await axios.post('/api/schedules', formData, config);
@@ -150,6 +201,7 @@ const Schedules = () => {
   // ─── Update ───────────────────────────────────────────────────────────────
   const handleUpdate = async () => {
     if (!validateForm()) return;
+    await checkConflictOnSubmit();
     try {
       const config = getAuthHeaders();
       const res = await axios.put(`/api/schedules/${editTarget.id}`, formData, config);
@@ -263,7 +315,7 @@ const Schedules = () => {
           </TextField>
         </Box>
 
-        {/* ✅ NEW: Student Count */}
+        {/* Student Count */}
         <TextField
           fullWidth required
           type="number"
@@ -289,6 +341,15 @@ const Schedules = () => {
             InputLabelProps={{ shrink: true }}
             value={formData.endTime} onChange={handleChange('endTime')} />
         </Box>
+
+        {/* Real-time room conflict hint */}
+        {roomConflict && (
+          <Alert severity="warning" sx={{ borderRadius: '10px' }}>
+            Room is already booked {roomConflict.startTime}–{roomConflict.endTime} for{' '}
+            <strong>{roomConflict.subjectOffering?.subject?.name ?? 'another class'}</strong>.
+            You can still save, but double-check before confirming.
+          </Alert>
+        )}
 
         {/* Status — Edit mode only */}
         {editTarget && (
@@ -397,7 +458,12 @@ const Schedules = () => {
                     </TableRow>
                   ) : (
                     schedules.map((s) => (
-                      <TableRow key={s.id} hover>
+                      <TableRow
+                        key={s.id}
+                        hover
+                        onClick={() => setDetailTarget(s)}
+                        sx={{ cursor: 'pointer' }}
+                      >
                         <TableCell sx={{ fontWeight: '600' }}>
                           {s.subjectOffering?.subject?.name ?? '—'}
                         </TableCell>
@@ -408,7 +474,6 @@ const Schedules = () => {
                         </TableCell>
                         <TableCell>{s.room?.name ?? '—'}</TableCell>
                         <TableCell>{s.section?.name ?? '—'}</TableCell>
-                        {/* ✅ NEW column */}
                         <TableCell align="center">
                           <Chip
                             label={s.studentCount ?? 0}
@@ -433,13 +498,13 @@ const Schedules = () => {
                         <TableCell>
                           <Box sx={{ display: 'flex', gap: 0.5 }}>
                             <Tooltip title="Edit">
-                              <IconButton size="small" onClick={() => openEdit(s)}
+                              <IconButton size="small" onClick={(e) => { e.stopPropagation(); openEdit(s); }}
                                 sx={{ color: '#2563eb' }}>
                                 <EditIcon fontSize="small" />
                               </IconButton>
                             </Tooltip>
                             <Tooltip title="Delete">
-                              <IconButton size="small" onClick={() => askDelete(s.id)}
+                              <IconButton size="small" onClick={(e) => { e.stopPropagation(); askDelete(s.id); }}
                                 sx={{ color: '#ef4444' }}>
                                 <DeleteIcon fontSize="small" />
                               </IconButton>
@@ -497,6 +562,17 @@ const Schedules = () => {
             </Box>
           </Box>
         </Modal>
+
+        {/* Class Details Modal — opened by clicking a row */}
+        {detailTarget && (
+          <ClassDetailsModal
+            schedule={detailTarget}
+            onClose={() => setDetailTarget(null)}
+            onSaved={fetchData}
+            getAuthHeaders={getAuthHeaders}
+            options={options}
+          />
+        )}
 
       </Box>
     </Box>

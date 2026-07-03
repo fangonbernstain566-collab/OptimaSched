@@ -1,29 +1,49 @@
 import { Router } from 'express';
 import prisma from '../config/prisma.js';
 import bcrypt from 'bcrypt';
+import { authenticate } from '../middleware/auth.js';
+import { logAudit } from '../utils/auditLog.js';
 
 const router = Router();
+router.use(authenticate); // ✅ makes req.user available below
 
-router.get('/all', async (req, res) => {
+// ─── GET /: Fetch all registered teachers ────────────────────────────────────
+router.get('/', async (req, res) => {
   try {
-    const teachers = await prisma.user.findMany({
-      where: { role: { name: 'FACULTY' } }, // Match your enum name!
-      select: { id: true, firstName: true, lastName: true }
+    const teachers = await prisma.teacher.findMany({
+      include: {
+        user:       { select: { id: true, firstName: true, lastName: true, email: true } },
+        department: true,
+      },
+      orderBy: { user: { lastName: 'asc' } },
     });
-    res.json({ success: true, data: teachers });
+
+    return res.json({ success: true, data: teachers });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    return res.status(500).json({ success: false, message: error.message });
   }
 });
 
+// ─── GET /all: Kept for backward compatibility ────────────────────────────────
+router.get('/all', async (req, res) => {
+  try {
+    const teachers = await prisma.teacher.findMany({
+      where: { user: { role: { name: 'INSTRUCTOR' } } },
+      include: {
+        user:       { select: { id: true, firstName: true, lastName: true, email: true } },
+        department: true,
+      },
+    });
+
+    return res.json({ success: true, data: teachers });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// ─── POST /: Register a new teacher ──────────────────────────────────────────
 router.post('/', async (req, res) => {
-  const {
-    firstName,
-    lastName,
-    email,
-    maxTeachingLoad,
-    departmentName,
-  } = req.body;
+  const { firstName, lastName, email, maxTeachingLoad, departmentName } = req.body;
 
   try {
     if (!firstName || !lastName || !email || !departmentName) {
@@ -35,86 +55,46 @@ router.post('/', async (req, res) => {
 
     const normalizedEmail = email.toLowerCase().trim();
 
-    let teacherRole = await prisma.role.findFirst({
-      where: {
-        name: 'INSTRUCTOR',
-      },
-    });
-
+    let teacherRole = await prisma.role.findFirst({ where: { name: 'INSTRUCTOR' } });
     if (!teacherRole) {
-      teacherRole = await prisma.role.create({
-        data: {
-          name: 'INSTRUCTOR',
-        },
-      });
+      teacherRole = await prisma.role.create({ data: { name: 'INSTRUCTOR' } });
     }
 
     const defaultPassword = 'Password123!';
     const passwordHash = await bcrypt.hash(defaultPassword, 10);
 
     const targetUser = await prisma.user.upsert({
-      where: {
-        email: normalizedEmail,
-      },
-      update: {
-        firstName,
-        lastName,
-        role: {
-          connect: {
-            id: teacherRole.id,
-          },
-        },
-      },
+      where:  { email: normalizedEmail },
+      update: { firstName, lastName, role: { connect: { id: teacherRole.id } } },
       create: {
         email: normalizedEmail,
         firstName,
         lastName,
         passwordHash,
-        role: {
-          connect: {
-            id: teacherRole.id,
-          },
-        },
+        role: { connect: { id: teacherRole.id } },
       },
     });
 
-    let targetDept = await prisma.department.findFirst({
-      where: {
-        name: departmentName,
-      },
-    });
+    let targetDept = await prisma.department.findFirst({ where: { name: departmentName } });
 
     if (!targetDept) {
       let primaryCollege = await prisma.college.findFirst();
-
       if (!primaryCollege) {
         primaryCollege = await prisma.college.create({
-          data: {
-            name: 'College of Information Technology',
-            code: 'CIT',
-          },
+          data: { name: 'College of Information Technology', code: 'CIT' },
         });
       }
 
       targetDept = await prisma.department.create({
         data: {
           name: departmentName,
-          code: departmentName
-            .split(' ')
-            .map((word) => word[0])
-            .join('')
-            .toUpperCase(),
+          code: departmentName.split(' ').map((w) => w[0]).join('').toUpperCase(),
           collegeId: primaryCollege.id,
         },
       });
     }
 
-    const existingTeacher = await prisma.teacher.findFirst({
-      where: {
-        userId: targetUser.id,
-      },
-    });
-
+    const existingTeacher = await prisma.teacher.findFirst({ where: { userId: targetUser.id } });
     if (existingTeacher) {
       return res.status(409).json({
         success: false,
@@ -124,14 +104,16 @@ router.post('/', async (req, res) => {
 
     const newTeacher = await prisma.teacher.create({
       data: {
-        userId: targetUser.id,
-        departmentId: targetDept.id,
+        userId:          targetUser.id,
+        departmentId:    targetDept.id,
         maxTeachingLoad: parseInt(maxTeachingLoad, 10) || 15,
       },
-      include: {
-        user: true,
-        department: true,
-      },
+      include: { user: true, department: true },
+    });
+
+    // ✅ NEW: audit log for teacher registration
+    await logAudit(req, `${req.user.firstName} registered teacher ${newTeacher.user.firstName} ${newTeacher.user.lastName}`, {
+      entityType: 'Teacher', entityId: newTeacher.id,
     });
 
     return res.status(201).json({
@@ -142,7 +124,6 @@ router.post('/', async (req, res) => {
     });
   } catch (error) {
     console.error('❌ Prisma execution exception caught:', error);
-
     return res.status(500).json({
       success: false,
       message: `Database Insertion Failure: ${error.message}`,

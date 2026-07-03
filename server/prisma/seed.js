@@ -138,6 +138,10 @@ async function main() {
     where:  { code: 'CS101' },
     update: { name: 'Intro to Computing', units: 3, isLabRequired: false },
     create: { code: 'CS101', name: 'Intro to Computing', units: 3, isLabRequired: false },
+
+    where:  { code: 'IT14' },
+    update: { name: 'Database Management', units: 3, isLabRequired: false },
+    create: { code: 'IT14', name: 'Database Management', units: 3, isLabRequired: false },
   });
   const offering = await prisma.subjectOffering.findFirst({
     where: { subjectId: subject.id },
