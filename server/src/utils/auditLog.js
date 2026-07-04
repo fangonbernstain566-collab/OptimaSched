@@ -1,18 +1,16 @@
 import prisma from '../config/prisma.js';
 
 const extractIpAddress = (req) => {
-  if (!req) return null;
-
-  const forwardedFor = req.headers?.['x-forwarded-for'];
-
+  const forwardedFor = req.headers['x-forwarded-for'];
   if (typeof forwardedFor === 'string' && forwardedFor.trim() !== '') {
     return forwardedFor.split(',')[0].trim();
   }
-
   return req.ip || req.socket?.remoteAddress || null;
 };
 
 const normalizePayload = (input, legacyDetails = {}) => {
+  // Backward-compatible signature:
+  // logAudit(req, "description text", { entityType, entityId, ... })
   if (typeof input === 'string') {
     return {
       action: 'CUSTOM',
@@ -34,44 +32,25 @@ const normalizePayload = (input, legacyDetails = {}) => {
   };
 };
 
-export const logAudit = async (
-  req,
-  payload,
-  legacyDetails = {},
-  options = {},
-  actor = req?.user
-) => {
+export const logAudit = async (req, payload, legacyDetails = {}, options = {}) => {
   const normalized = normalizePayload(payload, legacyDetails);
 
-  const actorFirst = actor?.firstName?.trim() ?? '';
-  const actorLast = actor?.lastName?.trim() ?? '';
-
-  const userName =
-    `${actorFirst} ${actorLast}`.trim() ||
-    actor?.email ||
-    null;
-
-  const userRole =
-    actor?.role?.name ||
-    actor?.role ||
-    null;
+  const actorFirst = req.user?.firstName?.trim() ?? '';
+  const actorLast = req.user?.lastName?.trim() ?? '';
+  const userName = `${actorFirst} ${actorLast}`.trim() || req.user?.email || null;
+  const userRole = req.user?.role?.name || req.user?.role || null;
 
   const data = {
-    userId: actor?.id ?? null,
+    userId: req.user?.id ?? null,
     userName,
     userRole,
-
     action: normalized.action,
     module: normalized.module,
     description: normalized.description,
-
     targetRecordId: normalized.targetRecordId,
     targetRecordName: normalized.targetRecordName,
-
     ipAddress: extractIpAddress(req),
-
-    userAgent: req?.get?.('user-agent') || null,
-
+    userAgent: req.get('user-agent') || null,
     metadata: normalized.metadata,
   };
 
@@ -81,7 +60,6 @@ export const logAudit = async (
     });
   } catch (err) {
     console.error('[auditLog] Failed to write log:', err.message);
-
     if (options.throwOnError) {
       throw err;
     }
