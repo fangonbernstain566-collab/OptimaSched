@@ -51,6 +51,12 @@ const NAV_ITEMS = [
     roles: ['ADMINISTRATOR', 'REGISTRAR_SCHEDULER'],
   },
   {
+    text:  'Check Schedules',
+    path:  '/my-schedules',
+    icon:  <SchedIcon fontSize="small" />,
+    roles: ['INSTRUCTOR'],
+  },
+  {
     text:  'Schedule Plotter',
     path:  '/schedules/plotter',
     icon:  <PlotterIcon fontSize="small" />,

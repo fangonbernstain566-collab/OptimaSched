@@ -5,6 +5,7 @@
   "main": "src/app.js",
   "scripts": {
     "dev": "node --watch src/app.js",
+    "seed": "node prisma/seed.js",
     "prisma:studio": "npx prisma studio"
   },
   "keywords": [],

@@ -1,0 +1,9 @@
+Admin: 
+
+admin@pclu.edu.ph
+admin_password_123
+
+Instructor:
+
+hely.ten@pclu.edu.ph
+Password123!

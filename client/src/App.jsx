@@ -11,6 +11,7 @@ import ManageSchedules from './pages/ManageSchedules';
 import SchedulePlotter from './pages/SchedulePlotter';
 import RecentlyDeletedSchedules from './pages/RecentlyDeletedSchedules';
 import AuditLogs from './pages/AuditLogs';
+import InstructorSchedules from './pages/InstructorSchedules';
 
 export default function App() {
   return (
@@ -93,6 +94,15 @@ export default function App() {
           element={
             <ProtectedRoute allowedRoles={['ADMINISTRATOR']}>
               <AuditLogs />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="my-schedules"
+          element={
+            <ProtectedRoute allowedRoles={['INSTRUCTOR']}>
+              <InstructorSchedules />
             </ProtectedRoute>
           }
         />
