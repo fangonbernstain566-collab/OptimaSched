@@ -9,6 +9,7 @@ import TeacherManager from './components/TeacherManager';
 import RoomManager from './components/RoomManager';
 import ManageSchedules from './pages/ManageSchedules';
 import SchedulePlotter from './pages/SchedulePlotter';
+import InstructorSchedules from './pages/InstructorSchedules';
 
 export default function App() {
   return (
@@ -73,6 +74,15 @@ export default function App() {
           element={
             <ProtectedRoute allowedRoles={['ADMINISTRATOR', 'REGISTRAR_SCHEDULER']}>
               <ManageSchedules />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="my-schedules"
+          element={
+            <ProtectedRoute allowedRoles={['INSTRUCTOR']}>
+              <InstructorSchedules />
             </ProtectedRoute>
           }
         />
