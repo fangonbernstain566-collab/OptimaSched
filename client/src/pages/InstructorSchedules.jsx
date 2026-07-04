@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import {
-  Box, Typography, Button, Paper, Table, TableBody, TableCell,
-  TableHead, TableRow, Modal, TextField, Stack,
-  CircularProgress, Chip, Alert, Card, CardContent, Select, MenuItem,
+  Box, Typography, Paper, Tab, Tabs, CircularProgress, Button, Modal, Stack,
+  TextField, Select, MenuItem, Divider, Card, CardContent, Chip, Alert, IconButton,
 } from '@mui/material';
 import {
   Add as AddIcon,
-  Schedule as ScheduleIcon,
+  Close as CloseIcon,
+  Delete as DeleteIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../hooks/useToast';
@@ -20,77 +20,113 @@ export default function InstructorSchedules() {
   const { user } = useAuth();
   const { toast, showToast, hideToast } = useToast();
 
-  const [allSchedules, setAllSchedules] = useState([]);
+  const [schedules, setSchedules] = useState([]);
+  const [rooms, setRooms] = useState([]);
+  const [selectedDay, setSelectedDay] = useState('Monday');
   const [loading, setLoading] = useState(false);
-  const [open, setOpen] = useState(false);
+  const [requestOpen, setRequestOpen] = useState(false);
+  const [selectedSlot, setSelectedSlot] = useState(null);
   const [formData, setFormData] = useState({
     subjectName: '',
-    dayOfWeek: 'Monday',
-    startTime: '07:30',
-    endTime: '09:00',
     room: '',
     studentCount: '',
     notes: '',
   });
 
-  // Get auth headers
   const getAuthHeaders = () => {
     const token = localStorage.getItem('optimasched_token');
     return token ? { headers: { Authorization: `Bearer ${token}` } } : {};
   };
 
-  // Fetch all schedules
-  const fetchSchedules = async () => {
+  const fetchData = async () => {
     setLoading(true);
     try {
       const config = getAuthHeaders();
-      const response = await axios.get('/api/schedules', config);
-      setAllSchedules(Array.isArray(response.data?.data) ? response.data.data : []);
+      const [resSched, resRooms] = await Promise.all([
+        axios.get('/api/schedules', config),
+        axios.get('/api/rooms', config),
+      ]);
+
+      setSchedules(resSched.data?.data ?? []);
+      setRooms(resRooms.data?.data ?? []);
     } catch (err) {
-      console.error('Failed to load schedules:', err);
-      showToast('Failed to load schedules.', 'error');
+      console.error('Failed to load data:', err);
+      showToast('Failed to load schedule data.', 'error');
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchSchedules();
+    fetchData();
   }, []);
 
-  // Handle form submission - save to notes or localStorage for now
+  const isSlotOccupied = (day, timeSlot) => {
+    return schedules.some(
+      (s) =>
+        s.dayOfWeek === day &&
+        s.startTime === timeSlot &&
+        s.status !== 'PENDING'
+    );
+  };
+
+  const handleSlotClick = (day, timeSlot) => {
+    if (isSlotOccupied(day, timeSlot)) {
+      showToast('This slot is already occupied.', 'error');
+      return;
+    }
+    setSelectedSlot({ day, timeSlot });
+    setRequestOpen(true);
+  };
+
   const handleSubmitRequest = async () => {
-    if (!formData.subjectName || !formData.startTime || !formData.endTime) {
+    if (!formData.subjectName || !formData.studentCount) {
       showToast('Please fill in all required fields.', 'error');
       return;
     }
 
     try {
-      // For now, store in localStorage since backend endpoint doesn't exist yet
+      const endTime = addMinutes(selectedSlot.timeSlot, 90);
       const requests = JSON.parse(localStorage.getItem('schedule_requests') || '[]');
       const newRequest = {
         id: Date.now(),
-        ...formData,
-        submittedAt: new Date().toISOString(),
+        subject: formData.subjectName,
+        dayOfWeek: selectedSlot.day,
+        startTime: selectedSlot.timeSlot,
+        endTime,
+        room: formData.room,
+        studentCount: parseInt(formData.studentCount),
+        notes: formData.notes,
         status: 'PENDING',
+        submittedAt: new Date().toISOString(),
       };
       requests.push(newRequest);
       localStorage.setItem('schedule_requests', JSON.stringify(requests));
 
       showToast('Schedule request submitted successfully!', 'success');
-      setOpen(false);
-      setFormData({
-        subjectName: '',
-        dayOfWeek: 'Monday',
-        startTime: '07:30',
-        endTime: '09:00',
-        room: '',
-        studentCount: '',
-        notes: '',
-      });
-      fetchSchedules();
+      setRequestOpen(false);
+      setSelectedSlot(null);
+      setFormData({ subjectName: '', room: '', studentCount: '', notes: '' });
     } catch (err) {
       showToast('Failed to submit request.', 'error');
+    }
+  };
+
+  const addMinutes = (time, mins) => {
+    const [h, m] = time.split(':').map(Number);
+    const total = h * 60 + m + mins;
+    return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
+  };
+
+  const handleCancelRequest = (requestId) => {
+    try {
+      const requests = JSON.parse(localStorage.getItem('schedule_requests') || '[]');
+      const filteredRequests = requests.filter((r) => r.id !== requestId);
+      localStorage.setItem('schedule_requests', JSON.stringify(filteredRequests));
+      showToast('Schedule request cancelled successfully.', 'success');
+      fetchData();
+    } catch (err) {
+      showToast('Failed to cancel request.', 'error');
     }
   };
 
@@ -102,86 +138,139 @@ export default function InstructorSchedules() {
     );
   }
 
-  // Get saved requests from localStorage
   const savedRequests = JSON.parse(localStorage.getItem('schedule_requests') || '[]');
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Typography variant="h4" fontWeight="700" sx={{ mb: 3, color: '#1B2B5E' }}>
-        Check Schedules
-      </Typography>
-
-      {/* Action Button */}
-      <Box sx={{ mb: 3 }}>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={() => setOpen(true)}
-          sx={{
-            backgroundColor: '#C49A3C',
-            color: '#fff',
-            fontWeight: 'bold',
-            '&:hover': { backgroundColor: '#B8892E' },
-          }}
-        >
-          Request New Schedule
-        </Button>
+    <Box sx={{ p: 4, minHeight: '100vh', bgcolor: '#f8fafc', mt: -4, mx: -4 }}>
+      {/* Header */}
+      <Box sx={{ mb: 4 }}>
+        <Typography variant="h4" fontWeight="700" sx={{ mb: 1, color: '#1B2B5E' }}>
+          Check Schedules
+        </Typography>
+        <Typography variant="body2" color="textSecondary">
+          View available schedules and request time slots for your classes
+        </Typography>
       </Box>
 
-      {/* All Schedules Section */}
-      <Typography variant="h6" fontWeight="700" sx={{ mt: 4, mb: 2, color: '#1B2B5E' }}>
-        All Available Schedules
-      </Typography>
+      {/* Tabs for Days */}
+      <Paper sx={{ mb: 4, borderRadius: 2 }}>
+        <Tabs
+          value={selectedDay}
+          onChange={(e, val) => setSelectedDay(val)}
+          variant="fullWidth"
+        >
+          {DAYS.map((day) => (
+            <Tab key={day} label={day} value={day} />
+          ))}
+        </Tabs>
+      </Paper>
 
-      {allSchedules.length > 0 ? (
-        <Paper sx={{ overflow: 'auto', mb: 4 }}>
-          <Table>
-            <TableHead sx={{ backgroundColor: '#1B2B5E' }}>
-              <TableRow>
-                <TableCell sx={{ color: '#fff', fontWeight: 'bold' }}>Subject</TableCell>
-                <TableCell sx={{ color: '#fff', fontWeight: 'bold' }}>Day</TableCell>
-                <TableCell sx={{ color: '#fff', fontWeight: 'bold' }}>Time</TableCell>
-                <TableCell sx={{ color: '#fff', fontWeight: 'bold' }}>Room</TableCell>
-                <TableCell sx={{ color: '#fff', fontWeight: 'bold' }}>Teacher</TableCell>
-                <TableCell sx={{ color: '#fff', fontWeight: 'bold' }}>Section</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {allSchedules.map((schedule) => (
-                <TableRow key={schedule.id} hover>
-                  <TableCell>{schedule.subject?.name || schedule.subjectName || 'N/A'}</TableCell>
-                  <TableCell>{schedule.dayOfWeek}</TableCell>
-                  <TableCell>{`${schedule.startTime} - ${schedule.endTime}`}</TableCell>
-                  <TableCell>{schedule.room?.name || schedule.room || 'TBD'}</TableCell>
-                  <TableCell>
-                    {schedule.teacher?.user?.firstName || schedule.teacher?.lastName || 'TBD'}
-                  </TableCell>
-                  <TableCell>{schedule.section?.name || 'N/A'}</TableCell>
-                </TableRow>
+      {/* Schedule Grid */}
+      <Box sx={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: 2, mb: 4 }}>
+        {/* Time Labels */}
+        <Box sx={{ display: 'flex', flexDirection: 'column', pt: 5 }}>
+          {TIME_SLOTS.map((slot) => (
+            <Box
+              key={slot}
+              sx={{
+                height: 100,
+                display: 'flex',
+                alignItems: 'center',
+                fontWeight: '600',
+                fontSize: '0.875rem',
+                color: '#64748b',
+                px: 2,
+              }}
+            >
+              {slot}
+            </Box>
+          ))}
+        </Box>
+
+        {/* Rooms Grid */}
+        <Box>
+          {rooms.length > 0 ? (
+            <Box sx={{ display: 'grid', gridTemplateColumns: `repeat(auto-fit, minmax(200px, 1fr))`, gap: 2 }}>
+              {rooms.map((room) => (
+                <Box key={room.id}>
+                  <Paper
+                    sx={{
+                      p: 2,
+                      mb: 2,
+                      backgroundColor: '#1B2B5E',
+                      color: '#fff',
+                      fontWeight: 'bold',
+                      borderRadius: 1,
+                      textAlign: 'center',
+                    }}
+                  >
+                    {room.name} (Cap: {room.capacity})
+                  </Paper>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    {TIME_SLOTS.map((slot) => {
+                      const occupied = isSlotOccupied(selectedDay, slot);
+                      return (
+                        <Box
+                          key={slot}
+                          onClick={() => !occupied && handleSlotClick(selectedDay, slot)}
+                          sx={{
+                            height: 100,
+                            border: '2px solid #e2e8f0',
+                            borderRadius: 1,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: occupied ? 'not-allowed' : 'pointer',
+                            backgroundColor: occupied ? '#fee2e2' : '#f8fafc',
+                            borderColor: occupied ? '#fca5a5' : '#e2e8f0',
+                            transition: 'all 0.2s ease',
+                            '&:hover': !occupied && {
+                              backgroundColor: '#e0e7ff',
+                              borderColor: '#4f46e5',
+                              boxShadow: 2,
+                            },
+                          }}
+                        >
+                          <Typography
+                            variant="caption"
+                            sx={{
+                              fontWeight: '600',
+                              color: occupied ? '#dc2626' : '#4f46e5',
+                              textAlign: 'center',
+                              px: 1,
+                            }}
+                          >
+                            {occupied ? '❌ Occupied' : '✓ Available'}
+                          </Typography>
+                        </Box>
+                      );
+                    })}
+                  </Box>
+                </Box>
               ))}
-            </TableBody>
-          </Table>
-        </Paper>
-      ) : (
-        <Alert severity="info" sx={{ mb: 4 }}>
-          No schedules available yet.
-        </Alert>
-      )}
+            </Box>
+          ) : (
+            <Alert severity="info">No rooms available.</Alert>
+          )}
+        </Box>
+      </Box>
 
-      {/* Pending Requests Section */}
-      <Typography variant="h6" fontWeight="700" sx={{ mt: 4, mb: 2, color: '#1B2B5E' }}>
+      <Divider sx={{ my: 4 }} />
+
+      {/* Your Requests Section */}
+      <Typography variant="h6" fontWeight="700" sx={{ mb: 2, color: '#1B2B5E' }}>
         Your Schedule Requests
       </Typography>
 
       {savedRequests.length > 0 ? (
-        <Stack spacing={2} sx={{ mb: 4 }}>
+        <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 2, mb: 4 }}>
           {savedRequests.map((request) => (
             <Card key={request.id}>
               <CardContent>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', mb: 1 }}>
                   <Box sx={{ flex: 1 }}>
                     <Typography variant="subtitle1" fontWeight="bold">
-                      {request.subjectName}
+                      {request.subject}
                     </Typography>
                     <Typography variant="body2" color="textSecondary">
                       {request.dayOfWeek} • {request.startTime} - {request.endTime}
@@ -191,48 +280,77 @@ export default function InstructorSchedules() {
                         Room: {request.room}
                       </Typography>
                     )}
+                    <Typography variant="body2" color="textSecondary">
+                      Students: {request.studentCount}
+                    </Typography>
                     {request.notes && (
-                      <Typography variant="body2" sx={{ mt: 1, fontStyle: 'italic' }}>
-                        Notes: {request.notes}
+                      <Typography variant="caption" sx={{ display: 'block', mt: 1, fontStyle: 'italic' }}>
+                        {request.notes}
                       </Typography>
                     )}
                   </Box>
-                  <Chip
-                    label={request.status || 'PENDING'}
-                    color={request.status === 'APPROVED' ? 'success' : 'warning'}
-                    variant="outlined"
-                  />
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, alignItems: 'flex-end' }}>
+                    <Chip
+                      label={request.status}
+                      size="small"
+                      color={request.status === 'APPROVED' ? 'success' : 'warning'}
+                      variant="outlined"
+                    />
+                    <IconButton
+                      size="small"
+                      onClick={() => handleCancelRequest(request.id)}
+                      sx={{
+                        color: '#dc2626',
+                        '&:hover': { backgroundColor: 'rgba(220, 38, 38, 0.1)' },
+                      }}
+                      title="Cancel request"
+                    >
+                      <DeleteIcon fontSize="small" />
+                    </IconButton>
+                  </Box>
                 </Box>
               </CardContent>
             </Card>
           ))}
-        </Stack>
+        </Box>
       ) : (
         <Alert severity="info" sx={{ mb: 4 }}>
-          No requests submitted yet.
+          No requests submitted yet. Click on an available slot to submit a request.
         </Alert>
       )}
 
       {/* Request Modal */}
-      <Modal open={open} onClose={() => setOpen(false)}>
+      <Modal open={requestOpen} onClose={() => setRequestOpen(false)}>
         <Box
           sx={{
             position: 'absolute',
             top: '50%',
             left: '50%',
             transform: 'translate(-50%, -50%)',
-            width: 500,
+            width: 450,
             backgroundColor: '#fff',
             p: 4,
             borderRadius: 2,
             boxShadow: 3,
-            maxHeight: '80vh',
-            overflowY: 'auto',
           }}
         >
-          <Typography variant="h6" fontWeight="bold" sx={{ mb: 3, color: '#1B2B5E' }}>
-            Request New Schedule
-          </Typography>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+            <Typography variant="h6" fontWeight="bold" sx={{ color: '#1B2B5E' }}>
+              Request Schedule
+            </Typography>
+            <Button
+              onClick={() => setRequestOpen(false)}
+              sx={{ minWidth: 'auto', p: 0.5 }}
+            >
+              <CloseIcon />
+            </Button>
+          </Box>
+
+          {selectedSlot && (
+            <Alert severity="info" sx={{ mb: 2 }}>
+              {selectedSlot.day} • {selectedSlot.timeSlot} - {addMinutes(selectedSlot.timeSlot, 90)}
+            </Alert>
+          )}
 
           <Stack spacing={2}>
             <TextField
@@ -244,44 +362,18 @@ export default function InstructorSchedules() {
             />
 
             <Select
-              label="Day of Week"
-              fullWidth
-              value={formData.dayOfWeek}
-              onChange={(e) => setFormData({ ...formData, dayOfWeek: e.target.value })}
-            >
-              {DAYS.map((day) => (
-                <MenuItem key={day} value={day}>{day}</MenuItem>
-              ))}
-            </Select>
-
-            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
-              <Select
-                label="Start Time"
-                value={formData.startTime}
-                onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
-              >
-                {TIME_SLOTS.map((time) => (
-                  <MenuItem key={time} value={time}>{time}</MenuItem>
-                ))}
-              </Select>
-              <Select
-                label="End Time"
-                value={formData.endTime}
-                onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
-              >
-                {TIME_SLOTS.map((time) => (
-                  <MenuItem key={time} value={time}>{time}</MenuItem>
-                ))}
-              </Select>
-            </Box>
-
-            <TextField
-              label="Preferred Room (Optional)"
-              fullWidth
+              label="Preferred Room"
               value={formData.room}
               onChange={(e) => setFormData({ ...formData, room: e.target.value })}
-              placeholder="e.g., Room 101"
-            />
+              fullWidth
+            >
+              <MenuItem value="">No Preference</MenuItem>
+              {rooms.map((room) => (
+                <MenuItem key={room.id} value={room.name}>
+                  {room.name} (Cap: {room.capacity})
+                </MenuItem>
+              ))}
+            </Select>
 
             <TextField
               label="Expected Student Count"
@@ -289,6 +381,7 @@ export default function InstructorSchedules() {
               fullWidth
               value={formData.studentCount}
               onChange={(e) => setFormData({ ...formData, studentCount: e.target.value })}
+              required
             />
 
             <TextField
@@ -298,13 +391,13 @@ export default function InstructorSchedules() {
               rows={3}
               value={formData.notes}
               onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-              placeholder="Any special requirements or notes..."
+              placeholder="Any special requirements..."
             />
 
             <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end', mt: 3 }}>
               <Button
                 variant="outlined"
-                onClick={() => setOpen(false)}
+                onClick={() => setRequestOpen(false)}
                 sx={{ color: '#1B2B5E', borderColor: '#1B2B5E' }}
               >
                 Cancel
@@ -312,6 +405,7 @@ export default function InstructorSchedules() {
               <Button
                 variant="contained"
                 onClick={handleSubmitRequest}
+                startIcon={<AddIcon />}
                 sx={{
                   backgroundColor: '#C49A3C',
                   color: '#fff',
@@ -319,7 +413,7 @@ export default function InstructorSchedules() {
                   '&:hover': { backgroundColor: '#B8892E' },
                 }}
               >
-                Submit Request
+                Request Schedule
               </Button>
             </Box>
           </Stack>
