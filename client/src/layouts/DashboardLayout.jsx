@@ -5,41 +5,48 @@ import { useAuth } from '../context/AuthContext';
 import {
   Box, Drawer, AppBar, Toolbar, List, Typography, Divider,
   IconButton, ListItem, ListItemButton, ListItemIcon, ListItemText,
-  Avatar, Button, Tooltip, useMediaQuery,
+  Avatar, Button, Tooltip, useMediaQuery, Collapse,
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import {
-  Menu          as MenuIcon,
-  Dashboard     as DashIcon,
-  CalendarMonth as SchedIcon,
-  GridView      as PlotterIcon,
+  Menu             as MenuIcon,
+  Dashboard        as DashIcon,
+  CalendarMonth    as SchedIcon,
+  GridView         as PlotterIcon,
   RestoreFromTrash as TrashIcon,
-  People        as TeacherIcon,
-  MeetingRoom   as RoomIcon,
-  History       as AuditIcon,
-  Logout        as LogoutIcon,
+  People           as TeacherIcon,
+  MeetingRoom      as RoomIcon,
+  History          as AuditIcon,
+  Logout           as LogoutIcon,
+  ChevronLeft,   // ✅ FIX 3: added for collapse toggle button
+  ChevronRight,  // ✅ FIX 3: added for collapse toggle button
+  KeyboardArrowRight as CaretIcon,
+  ExpandLess,
+  ExpandMore,
 } from '@mui/icons-material';
 
 // ─── Design tokens — matches Login.jsx ───────────────────────────────────────
 const C = {
-  primary:     '#1B2B5E',
-  accent:      '#C49A3C',
-  accentLight: 'rgba(196, 154, 60, 0.12)',
-  background:  '#F2F0EB',
-  card:        '#ffffff',
-  secondary:   '#E8E4D9',
-  muted:       '#6B6E7E',
-  border:      'rgba(27, 43, 94, 0.10)',
-  sidebarText: 'rgba(255,255,255,0.75)',
-  sidebarHover:'rgba(255,255,255,0.08)',
+  primary:      '#1B2B5E',
+  accent:       '#C49A3C',
+  accentLight:  'rgba(196, 154, 60, 0.12)',
+  background:   '#F2F0EB',
+  card:         '#ffffff',
+  secondary:    '#E8E4D9',
+  muted:        '#6B6E7E',
+  border:       'rgba(27, 43, 94, 0.10)',
+  sidebarBg:    '#1B2B5E',
+  sidebarText:  'rgba(255,255,255,0.75)',
+  sidebarHover: 'rgba(255,255,255,0.06)',
+  sidebarActive:'rgba(255,255,255,0.08)',
 };
 
-const DRAWER_WIDTH = 260;
+const DRAWER_WIDTH    = 260;
 const COLLAPSED_WIDTH = 76;
 
-// ─── Nav config ───────────────────────────────────────────────────────────────
-// roles: plain strings matching what AuthContext.login() saves (user.role as string,
-// NOT a Prisma object). Comparison must be against user?.role, not user?.role?.name.
+// ─── Nav items ────────────────────────────────────────────────────────────────
+// roles: plain strings from AuthContext.login() — user.role is a STRING like
+// "ADMINISTRATOR", NOT a Prisma object. Never use user?.role?.name here.
 const NAV_ITEMS = [
   {
     text:  'Dashboard View',
@@ -53,19 +60,13 @@ const NAV_ITEMS = [
     icon:  <SchedIcon fontSize="small" />,
     roles: ['ADMINISTRATOR', 'REGISTRAR_SCHEDULER'],
   },
+  // ✅ FIX 1: removed duplicate "Manage Schedules" entry that was here
   {
     text:  'Schedule Plotter',
     path:  '/schedules/plotter',
     icon:  <PlotterIcon fontSize="small" />,
     roles: ['ADMINISTRATOR', 'REGISTRAR_SCHEDULER'],
   },
-  {
-    text:  'Manage Schedules',
-    path:  '/schedules',
-    icon:  <SchedIcon fontSize="small" />,
-    roles: ['ADMINISTRATOR', 'REGISTRAR_SCHEDULER'],
-  },
- 
   {
     text:  'Manage Teachers',
     path:  '/teachers',
@@ -78,11 +79,27 @@ const NAV_ITEMS = [
     icon:  <RoomIcon fontSize="small" />,
     roles: ['ADMINISTRATOR'],
   },
-   {
+  {
     text:  'Recently Deleted',
-    path:  '/schedules/recently-deleted',
     icon:  <TrashIcon fontSize="small" />,
     roles: ['ADMINISTRATOR', 'REGISTRAR_SCHEDULER'],
+    children: [
+      {
+        text:  'Deleted Schedules',
+        path:  '/schedules/recently-deleted',
+        roles: ['ADMINISTRATOR', 'REGISTRAR_SCHEDULER'],
+      },
+      {
+        text:  'Deleted Teachers',
+        path:  '/teachers/recently-deleted',
+        roles: ['ADMINISTRATOR'],
+      },
+      {
+        text:  'Deleted Rooms',
+        path:  '/rooms/recently-deleted',
+        roles: ['ADMINISTRATOR'],
+      },
+    ],
   },
   {
     text:  'Audit Logs',
@@ -94,13 +111,14 @@ const NAV_ITEMS = [
 
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function DashboardLayout() {
-  const { user, logout }              = useAuth();
-  const navigate                      = useNavigate();
-  const location                      = useLocation();
-  const theme                         = useTheme();
-  const isDesktop                     = useMediaQuery(theme.breakpoints.up('md'));
-  const [mobileOpen, setMobileOpen]   = useState(false);
-  const [collapsed, setCollapsed]     = useState(false);
+  const { user, logout }            = useAuth();
+  const navigate                    = useNavigate();
+  const location                    = useLocation();
+  const theme                       = useTheme();
+  const isDesktop                   = useMediaQuery(theme.breakpoints.up('md'));
+  const [mobileOpen, setMobileOpen]         = useState(false);
+  const [collapsed, setCollapsed]           = useState(false);
+  const [deletedMenuOpen, setDeletedMenuOpen] = useState(false);
 
   const handleDrawerToggle = () => {
     if (isDesktop) {
@@ -112,8 +130,7 @@ export default function DashboardLayout() {
 
   const drawerWidth = collapsed ? COLLAPSED_WIDTH : DRAWER_WIDTH;
 
-  // user.role is a plain string from AuthContext ("ADMINISTRATOR", etc.)
-  // NOT a Prisma object — never use user?.role?.name here
+  // user.role is a plain string ("ADMINISTRATOR" etc.) — not a Prisma object
   const userRole = user?.role ?? '';
 
   const handleLogout = () => {
@@ -121,24 +138,38 @@ export default function DashboardLayout() {
     navigate('/login');
   };
 
-  // ─── Sidebar ────────────────────────────────────────────────────────────────
+  // ─── Sidebar content ────────────────────────────────────────────────────────
   const drawerContent = (
     <Box
       sx={{
         height:        '100%',
         display:       'flex',
         flexDirection: 'column',
-        bgcolor:       C.primary,
+        bgcolor:       C.sidebarBg,
         fontFamily:    "'Plus Jakarta Sans', sans-serif",
+        position:      'relative',
+        overflowX:     'hidden',
         '&::-webkit-scrollbar':       { width: 4 },
         '&::-webkit-scrollbar-track': { background: 'transparent' },
         '&::-webkit-scrollbar-thumb': { background: 'rgba(255,255,255,0.12)', borderRadius: 2 },
       }}
     >
       {/* ── Logo ──────────────────────────────────────────────────────────── */}
-      <Box sx={{ px: collapsed ? 0 : 3, pt: 3.5, pb: 3 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, justifyContent: collapsed ? 'center' : 'flex-start' }}>
-          {/* ✅ FIX: removed duplicate CalendarIcon import — SchedIcon is the same icon */}
+      <Box
+        sx={{
+          px:  collapsed ? 0 : 3,
+          pt:  3.5,
+          pb:  3,
+        }}
+      >
+        <Box
+          sx={{
+            display:        'flex',
+            alignItems:     'center',
+            gap:            1.5,
+            justifyContent: collapsed ? 'center' : 'flex-start',
+          }}
+        >
           <Box
             sx={{
               width:          36,
@@ -154,6 +185,7 @@ export default function DashboardLayout() {
           >
             <SchedIcon sx={{ color: '#fff', fontSize: 18 }} />
           </Box>
+
           {!collapsed && (
             <Box>
               <Typography
@@ -168,9 +200,7 @@ export default function DashboardLayout() {
               >
                 PCLU
               </Typography>
-              <Typography
-                sx={{ color: '#fff', fontSize: '0.9rem', fontWeight: 700, lineHeight: 1.3 }}
-              >
+              <Typography sx={{ color: '#fff', fontSize: '0.9rem', fontWeight: 700, lineHeight: 1.3 }}>
                 OptimaSched
               </Typography>
             </Box>
@@ -180,58 +210,65 @@ export default function DashboardLayout() {
 
       {/* ── User block ────────────────────────────────────────────────────── */}
       <Box sx={{ px: collapsed ? 1 : 3, pb: 3 }}>
-        <Box
-          sx={{
-            display:        'flex',
-            alignItems:     'center',
-            justifyContent: collapsed ? 'center' : 'flex-start',
-            gap:            1.5,
-            p:              1.5,
-            borderRadius:   '10px',
-            bgcolor:        'rgba(255,255,255,0.06)',
-            border:         '1px solid rgba(255,255,255,0.08)',
-          }}
-        >
-          <Avatar
+        <Tooltip title={collapsed ? `${user?.firstName ?? ''} ${user?.lastName ?? ''}` : ''} placement="right">
+          <Box
             sx={{
-              width:      36,
-              height:     36,
-              bgcolor:    C.accent,
-              fontSize:   '0.8rem',
-              fontWeight: 700,
-              flexShrink: 0,
+              display:        'flex',
+              alignItems:     'center',
+              justifyContent: collapsed ? 'center' : 'flex-start',
+              gap:            1.5,
+              p:              1.5,
+              borderRadius:   '12px',
+              bgcolor:        'rgba(255,255,255,0.06)',
+              border:         '1px solid rgba(255,255,255,0.08)',
+              cursor:         'pointer',
+              transition:     'background-color 0.15s ease',
+              '&:hover':      { bgcolor: 'rgba(255,255,255,0.09)' },
             }}
           >
-            {user?.firstName?.[0]?.toUpperCase() ?? 'U'}
-          </Avatar>
-          {!collapsed && (
-            <Box sx={{ minWidth: 0 }}>
-              <Typography
-                noWrap
-                sx={{ color: '#fff', fontSize: '0.8rem', fontWeight: 600, lineHeight: 1.3 }}
-              >
-                {user?.firstName} {user?.lastName}
-              </Typography>
-              <Typography
-                noWrap
-                sx={{
-                  color:         C.accent,
-                  fontSize:      '0.65rem',
-                  fontWeight:    600,
-                  letterSpacing: '0.06em',
-                  textTransform: 'lowercase',
-                }}
-              >
-                {userRole.replace(/_/g, ' ').toLowerCase()}
-              </Typography>
-            </Box>
-          )}
-        </Box>
+            <Avatar
+              sx={{
+                width:      36,
+                height:     36,
+                bgcolor:    C.accent,
+                fontSize:   '0.8rem',
+                fontWeight: 700,
+                flexShrink: 0,
+              }}
+            >
+              {user?.firstName?.[0]?.toUpperCase() ?? 'U'}
+            </Avatar>
+
+            {!collapsed && (
+              <Box sx={{ minWidth: 0 }}>
+                <Typography noWrap sx={{ color: '#fff', fontSize: '0.8rem', fontWeight: 600, lineHeight: 1.3 }}>
+                  {user?.firstName} {user?.lastName}
+                </Typography>
+                <Typography
+                  noWrap
+                  sx={{
+                    color:         C.accent,
+                    fontSize:      '0.65rem',
+                    fontWeight:    600,
+                    letterSpacing: '0.06em',
+                    textTransform: 'lowercase',
+                  }}
+                >
+                  {userRole.replace(/_/g, ' ').toLowerCase()}
+                </Typography>
+              </Box>
+            )}
+
+            {!collapsed && (
+              <CaretIcon sx={{ color: 'rgba(255,255,255,0.3)', fontSize: 18, ml: 'auto', flexShrink: 0 }} />
+            )}
+          </Box>
+        </Tooltip>
       </Box>
 
-      <Divider sx={{ borderColor: 'rgba(255,255,255,0.07)', mx: 3, mb: 2 }} />
+      <Divider sx={{ borderColor: 'rgba(255,255,255,0.07)', mx: collapsed ? 1 : 3, mb: 2 }} />
 
-      {/* ── Nav label ─────────────────────────────────────────────────────── */}
+      {/* ── Nav section label ─────────────────────────────────────────────── */}
       {!collapsed && (
         <Typography
           sx={{
@@ -253,6 +290,138 @@ export default function DashboardLayout() {
         {NAV_ITEMS.map((item) => {
           if (item.roles && !item.roles.includes(userRole)) return null;
 
+          // ── Group item (e.g. "Recently Deleted") — expands into per-entity links ──
+          if (item.children) {
+            const visibleChildren = item.children.filter(
+              (child) => !child.roles || child.roles.includes(userRole)
+            );
+            if (visibleChildren.length === 0) return null;
+
+            const isGroupActive = visibleChildren.some((child) => location.pathname === child.path);
+
+            const handleGroupClick = () => {
+              if (collapsed) {
+                navigate(visibleChildren[0].path);
+                setMobileOpen(false);
+              } else {
+                setDeletedMenuOpen((o) => !o);
+              }
+            };
+
+            const groupButton = (
+              <ListItemButton
+                onClick={handleGroupClick}
+                selected={isGroupActive}
+                sx={{
+                  borderRadius:           '12px',
+                  py:                     1,
+                  px:                     1.5,
+                  justifyContent:         collapsed ? 'center' : 'flex-start',
+                  position:               'relative',
+                  transition:             'all 0.15s ease',
+                  bgcolor:                isGroupActive ? C.accentLight : 'transparent',
+                  '&:hover':              { bgcolor: isGroupActive ? C.accentLight : C.sidebarHover },
+                  '&.Mui-selected':       { bgcolor: C.accentLight },
+                  '&.Mui-selected:hover': { bgcolor: C.accentLight },
+                }}
+              >
+                {isGroupActive && !collapsed && (
+                  <Box
+                    sx={{
+                      position:     'absolute',
+                      left:         0,
+                      top:          '50%',
+                      transform:    'translateY(-50%)',
+                      width:        3,
+                      height:       20,
+                      borderRadius: '0 3px 3px 0',
+                      bgcolor:      C.accent,
+                    }}
+                  />
+                )}
+
+                <ListItemIcon
+                  sx={{
+                    minWidth:   collapsed ? 0 : 36,
+                    color:      isGroupActive ? C.accent : C.sidebarText,
+                    transition: 'color 0.15s',
+                  }}
+                >
+                  {item.icon}
+                </ListItemIcon>
+
+                {!collapsed && (
+                  <>
+                    <ListItemText
+                      primary={item.text}
+                      sx={{
+                        '& .MuiListItemText-primary': {
+                          fontSize:   '0.825rem',
+                          fontWeight: isGroupActive ? 600 : 400,
+                          color:      isGroupActive ? '#fff' : C.sidebarText,
+                          transition: 'all 0.15s',
+                        },
+                      }}
+                    />
+                    {deletedMenuOpen ? (
+                      <ExpandLess sx={{ fontSize: 18, color: C.sidebarText }} />
+                    ) : (
+                      <ExpandMore sx={{ fontSize: 18, color: C.sidebarText }} />
+                    )}
+                  </>
+                )}
+              </ListItemButton>
+            );
+
+            return (
+              <ListItem key="recently-deleted-group" disablePadding sx={{ display: 'block' }}>
+                {collapsed ? (
+                  <Tooltip title={item.text} placement="right" arrow>
+                    <Box sx={{ width: '100%' }}>{groupButton}</Box>
+                  </Tooltip>
+                ) : groupButton}
+
+                {!collapsed && (
+                  <Collapse in={deletedMenuOpen} timeout="auto" unmountOnExit>
+                    <List component="div" disablePadding sx={{ mt: 0.5, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                      {visibleChildren.map((child) => {
+                        const isChildActive = location.pathname === child.path;
+                        return (
+                          <ListItemButton
+                            key={child.path}
+                            onClick={() => { navigate(child.path); setMobileOpen(false); }}
+                            selected={isChildActive}
+                            sx={{
+                              borderRadius:           '10px',
+                              py:                     0.75,
+                              pl:                     4.5,
+                              pr:                     1.5,
+                              bgcolor:                isChildActive ? C.accentLight : 'transparent',
+                              '&:hover':              { bgcolor: isChildActive ? C.accentLight : C.sidebarHover },
+                              '&.Mui-selected':       { bgcolor: C.accentLight },
+                              '&.Mui-selected:hover': { bgcolor: C.accentLight },
+                            }}
+                          >
+                            <ListItemText
+                              primary={child.text}
+                              sx={{
+                                '& .MuiListItemText-primary': {
+                                  fontSize:   '0.775rem',
+                                  fontWeight: isChildActive ? 600 : 400,
+                                  color:      isChildActive ? '#fff' : C.sidebarText,
+                                },
+                              }}
+                            />
+                          </ListItemButton>
+                        );
+                      })}
+                    </List>
+                  </Collapse>
+                )}
+              </ListItem>
+            );
+          }
+
           const isActive = location.pathname === item.path;
 
           const button = (
@@ -260,7 +429,7 @@ export default function DashboardLayout() {
               onClick={() => { navigate(item.path); setMobileOpen(false); }}
               selected={isActive}
               sx={{
-                borderRadius:           '8px',
+                borderRadius:           '12px',
                 py:                     1,
                 px:                     1.5,
                 justifyContent:         collapsed ? 'center' : 'flex-start',
@@ -272,22 +441,22 @@ export default function DashboardLayout() {
                 '&.Mui-selected:hover': { bgcolor: C.accentLight },
               }}
             >
-              {/* Gold left-edge active indicator */}
-              {isActive && (
+              {/* Gold left-edge active bar — hidden when collapsed */}
+              {isActive && !collapsed && (
                 <Box
                   sx={{
                     position:     'absolute',
                     left:         0,
-                    top:          '20%',
-                    bottom:       '20%',
+                    top:          '50%',
+                    transform:    'translateY(-50%)',
                     width:        3,
+                    height:       20,
                     borderRadius: '0 3px 3px 0',
                     bgcolor:      C.accent,
                   }}
                 />
               )}
 
-              {/* ✅ FIX: icon was defined in NAV_ITEMS but never rendered */}
               <ListItemIcon
                 sx={{
                   minWidth:   collapsed ? 0 : 36,
@@ -298,7 +467,6 @@ export default function DashboardLayout() {
                 {item.icon}
               </ListItemIcon>
 
-              {/* ✅ Uses sx selector — avoids MUI ignoring color in primaryTypographyProps */}
               {!collapsed && (
                 <ListItemText
                   primary={item.text}
@@ -316,9 +484,10 @@ export default function DashboardLayout() {
           );
 
           return (
-            <ListItem key={item.text} disablePadding>
+            // ✅ Use item.path as key — unique per route, never duplicates
+            <ListItem key={item.path} disablePadding>
               {collapsed ? (
-                <Tooltip title={item.text} placement="right">
+                <Tooltip title={item.text} placement="right" arrow>
                   <Box sx={{ width: '100%' }}>{button}</Box>
                 </Tooltip>
               ) : button}
@@ -345,10 +514,7 @@ export default function DashboardLayout() {
               fontSize:       '0.825rem',
               fontWeight:     500,
               textTransform:  'none',
-              '&:hover': {
-                bgcolor: 'rgba(239, 68, 68, 0.12)',
-                color:   '#f87171',
-              },
+              '&:hover':      { bgcolor: 'rgba(239, 68, 68, 0.12)', color: '#f87171' },
             }}
           >
             {collapsed ? <LogoutIcon fontSize="small" /> : 'Disconnect Session'}
@@ -360,7 +526,6 @@ export default function DashboardLayout() {
 
   // ─── Render ───────────────────────────────────────────────────────────────
   return (
-    // ✅ FIX: was C.background (#F2F0EB beige) — pages need a white canvas
     <Box sx={{ display: 'flex', bgcolor: C.card, minHeight: '100vh', overflowX: 'hidden' }}>
 
       {/* ── AppBar ────────────────────────────────────────────────────────── */}
@@ -385,7 +550,7 @@ export default function DashboardLayout() {
             color="inherit"
             edge="start"
             onClick={handleDrawerToggle}
-            sx={{ mr: 1 }}
+            sx={{ mr: 1, display: { xs: 'inline-flex', md: 'none' } }}
           >
             <MenuIcon />
           </IconButton>
@@ -412,9 +577,7 @@ export default function DashboardLayout() {
             }}
           >
             <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: C.accent }} />
-            <Typography
-              sx={{ color: C.muted, fontSize: '0.7rem', fontWeight: 600, letterSpacing: '0.04em' }}
-            >
+            <Typography sx={{ color: C.muted, fontSize: '0.7rem', fontWeight: 600, letterSpacing: '0.04em' }}>
               A.Y. 2026–2027
             </Typography>
           </Box>
@@ -436,7 +599,17 @@ export default function DashboardLayout() {
       </AppBar>
 
       {/* ── Sidebar drawers ───────────────────────────────────────────────── */}
-      <Box component="nav" sx={{ width: { md: drawerWidth }, flexShrink: { md: 0 } }}>
+      <Box
+        component="nav"
+        sx={{
+          width:      { md: drawerWidth },
+          flexShrink: { md: 0 },
+          transition: theme.transitions.create('width', {
+            easing:   theme.transitions.easing.sharp,
+            duration: theme.transitions.duration.leavingScreen,
+          }),
+        }}
+      >
         {/* Mobile — temporary */}
         <Drawer
           variant="temporary"
@@ -458,11 +631,11 @@ export default function DashboardLayout() {
           sx={{
             display: { xs: 'none', md: 'block' },
             '& .MuiDrawer-paper': {
-              boxSizing: 'border-box',
-              width:     drawerWidth,
-              border:    'none',
-              boxShadow: '4px 0 24px rgba(27,43,94,0.12)',
-              overflowX: 'hidden',
+              boxSizing:  'border-box',
+              width:      drawerWidth,
+              border:     'none',
+              boxShadow:  '4px 0 24px rgba(27,43,94,0.12)',
+              overflowX:  'hidden',
               transition: theme.transitions.create('width', {
                 easing:   theme.transitions.easing.sharp,
                 duration: theme.transitions.duration.leavingScreen,
@@ -472,26 +645,60 @@ export default function DashboardLayout() {
         >
           {drawerContent}
         </Drawer>
+
+        {/* Floating collapse toggle — rendered outside the drawer's clipped
+            scroll area so it isn't cut off by overflowX: hidden */}
+        {isDesktop && (
+          <Box
+            component="button"
+            onClick={() => setCollapsed((c) => !c)}
+            sx={{
+              position:       'fixed',
+              left:           drawerWidth - 14,
+              top:            '50%',
+              transform:      'translateY(-50%)',
+              width:          28,
+              height:         28,
+              borderRadius:   '50%',
+              bgcolor:        C.accent,
+              border:         `2px solid ${C.sidebarBg}`,
+              cursor:         'pointer',
+              display:        'flex',
+              alignItems:     'center',
+              justifyContent: 'center',
+              zIndex:         theme.zIndex.drawer + 1,
+              boxShadow:      '0 2px 8px rgba(0,0,0,0.3)',
+              transition:     theme.transitions.create('left', {
+                easing:   theme.transitions.easing.sharp,
+                duration: theme.transitions.duration.leavingScreen,
+              }),
+              '&:hover': { bgcolor: '#b8892e' },
+            }}
+          >
+            {collapsed
+              ? <ChevronRight sx={{ fontSize: 15, color: '#fff' }} />
+              : <ChevronLeft  sx={{ fontSize: 15, color: '#fff' }} />}
+          </Box>
+        )}
       </Box>
 
       {/* ── Main content ──────────────────────────────────────────────────── */}
       <Box
         component="main"
         sx={{
-          flexGrow:  1,
-          p:         3,
-          boxSizing: 'border-box',
-          width:     { md: `calc(100% - ${drawerWidth}px)` },
-          minHeight: '100vh',
-          // ✅ FIX: was C.background (beige) — explicit white for all page content
-          bgcolor:   C.card,
+          flexGrow:   1,
+          p:          3,
+          boxSizing:  'border-box',
+          width:      { md: `calc(100% - ${drawerWidth}px)` },
+          minHeight:  '100vh',
+          bgcolor:    C.card,
           transition: theme.transitions.create('width', {
             easing:   theme.transitions.easing.sharp,
             duration: theme.transitions.duration.leavingScreen,
           }),
         }}
       >
-        <Toolbar /> {/* Spacer — keeps content below the fixed AppBar */}
+        <Toolbar />
         <Outlet />
       </Box>
     </Box>
