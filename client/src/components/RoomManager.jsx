@@ -1,14 +1,28 @@
 // client/src/components/RoomManager.jsx
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
 import {
   Box, Button, MenuItem, Modal, Paper, Stack,
   Table, TableBody, TableCell, TableContainer,
   TableHead, TableRow, TextField, Typography,
+  IconButton, Tooltip, Divider, TablePagination,
 } from '@mui/material';
-import { Add as AddIcon } from '@mui/icons-material';
+import {
+  Add as AddIcon,
+  Edit as EditIcon,
+  Delete as DeleteIcon,
+  RestoreFromTrash as RestoreFromTrashIcon,
+} from '@mui/icons-material';
 import { useToast } from '../hooks/useToast';
 import Toast from '../components/Toast';
+import SortableTableCell from '../components/SortableTableCell';
+
+const formatDate = (value) => {
+  if (!value) return '-';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? '-' : date.toLocaleDateString();
+};
 
 const ROOM_TYPES = [
   { value: 'LECTURE_ROOM',        label: 'Lecture Room'        },
@@ -16,15 +30,23 @@ const ROOM_TYPES = [
   { value: 'LABORATORY',          label: 'Laboratory'          },
 ];
 
+const INITIAL_FORM = {
+  name:         '',
+  capacity:     40,
+  type:         'LECTURE_ROOM',
+  buildingName: 'Main Building',
+};
+
 export default function RoomManager() {
-  const [rooms, setRooms] = useState([]);
-  const [open, setOpen]   = useState(false);
-  const [formData, setFormData] = useState({
-    name:         '',
-    capacity:     40,
-    type:         'LECTURE_ROOM',
-    buildingName: 'Main Building',
-  });
+  const navigate = useNavigate();
+  const [rooms, setRooms]           = useState([]);
+  const [open, setOpen]             = useState(false);
+  const [editTarget, setEditTarget] = useState(null);
+  const [formData, setFormData]     = useState(INITIAL_FORM);
+  const [deleteId, setDeleteId]     = useState(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [pagination, setPagination] = useState({ page: 1, pageSize: 10, total: 0, totalPages: 1 });
+  const [sort, setSort]             = useState({ sortBy: null, order: null });
 
   const { toast, showToast, hideToast } = useToast();
 
@@ -33,50 +55,111 @@ export default function RoomManager() {
     return token ? { headers: { Authorization: `Bearer ${token}` } } : {};
   };
 
-  const fetchRooms = async () => {
+  const fetchRooms = async (page = pagination.page, pageSize = pagination.pageSize, sortState = sort) => {
     try {
-      const response = await axios.get('/api/rooms', getAuthHeaders());
-      if (response.data.success) setRooms(response.data.data || []);
+      const config = getAuthHeaders();
+      const response = await axios.get('/api/rooms', {
+        ...config,
+        params: {
+          page,
+          pageSize,
+          ...(sortState.sortBy ? { sortBy: sortState.sortBy, order: sortState.order } : {}),
+        },
+      });
+      if (response.data.success) {
+        const data = response.data.data || [];
+        setRooms(data);
+        setPagination(response.data.pagination ?? { page, pageSize, total: data.length, totalPages: 1 });
+      }
     } catch (error) {
       showToast(error.response?.data?.message ?? 'Failed to fetch rooms.', 'error');
     }
   };
 
-  useEffect(() => { fetchRooms(); }, []);
+  useEffect(() => { fetchRooms(1, pagination.pageSize, sort); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Cycles asc -> desc -> unsorted; resets to page 1 (a new sort order changes
+  // what belongs on "page 1"), but keeps the current page size.
+  const handleSort = (sortBy, order) => {
+    const nextSort = { sortBy, order };
+    setSort(nextSort);
+    fetchRooms(1, pagination.pageSize, nextSort);
+  };
 
   const handleChange = (event) => {
     const { name, value } = event.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = async (event) => {
-    event.preventDefault();
+  const openCreate = () => {
+    setEditTarget(null);
+    setFormData(INITIAL_FORM);
+    setOpen(true);
+  };
+
+  const openEdit = (room) => {
+    setEditTarget(room);
+    setFormData({
+      name:         room.name ?? '',
+      capacity:     room.capacity ?? 40,
+      type:         room.type ?? 'LECTURE_ROOM',
+      buildingName: room.building?.name ?? 'Main Building',
+    });
+    setOpen(true);
+  };
+
+  const closeModal = () => {
+    setOpen(false);
+    setEditTarget(null);
+    setFormData(INITIAL_FORM);
+  };
+
+  const handleCreate = async () => {
     try {
       const response = await axios.post('/api/rooms', formData, getAuthHeaders());
       if (response.data.success) {
         showToast(response.data.message ?? 'Room created successfully.', 'success');
-        setOpen(false);
-        setFormData({ name: '', capacity: 40, type: 'LECTURE_ROOM', buildingName: 'Main Building' });
-        fetchRooms();
+        closeModal();
+        fetchRooms(1, pagination.pageSize);
       }
     } catch (error) {
       showToast(error.response?.data?.message ?? 'Failed to create room.', 'error');
     }
   };
 
-  const handleDelete = async (roomId) => {
-    const confirmDelete = window.confirm(
-      'Delete this room? This will only work if the room is not used in any schedule.'
-    );
-    if (!confirmDelete) return;
+  const handleUpdate = async () => {
     try {
-      const response = await axios.delete(`/api/rooms/${roomId}`, getAuthHeaders());
+      const response = await axios.put(`/api/rooms/${editTarget.id}`, formData, getAuthHeaders());
+      if (response.data.success) {
+        showToast(response.data.message ?? 'Room updated successfully.', 'success');
+        closeModal();
+        fetchRooms(pagination.page, pagination.pageSize);
+      }
+    } catch (error) {
+      showToast(error.response?.data?.message ?? 'Failed to update room.', 'error');
+    }
+  };
+
+  const handleSubmit = (event) => {
+    event.preventDefault();
+    editTarget ? handleUpdate() : handleCreate();
+  };
+
+  const askDelete = (id) => { setDeleteId(id); setDeleteOpen(true); };
+
+  const confirmDelete = async () => {
+    try {
+      const response = await axios.delete(`/api/rooms/${deleteId}`, getAuthHeaders());
       if (response.data.success) {
         showToast(response.data.message ?? 'Room deleted successfully.', 'success');
-        fetchRooms();
+        setDeleteOpen(false);
+        setDeleteId(null);
+        const isLastRowOnPage = rooms.length === 1 && pagination.page > 1;
+        fetchRooms(isLastRowOnPage ? pagination.page - 1 : pagination.page, pagination.pageSize);
       }
     } catch (error) {
       showToast(error.response?.data?.message ?? 'Failed to delete room.', 'error');
+      setDeleteOpen(false);
     }
   };
 
@@ -103,65 +186,96 @@ export default function RoomManager() {
           </Typography>
         </Box>
 
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={() => setOpen(true)}
-          sx={{ bgcolor: '#2563eb', borderRadius: '12px', textTransform: 'none' }}
-        >
-          Add Room
-        </Button>
+        <Box sx={{ display: 'flex', gap: 1.25 }}>
+          <Button
+            variant="outlined"
+            startIcon={<RestoreFromTrashIcon />}
+            onClick={() => navigate('/rooms/recently-deleted')}
+            sx={{ borderRadius: '12px', textTransform: 'none' }}
+          >
+            Recently Deleted
+          </Button>
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={openCreate}
+            sx={{ bgcolor: '#2563eb', borderRadius: '12px', textTransform: 'none' }}
+          >
+            Add Room
+          </Button>
+        </Box>
       </Box>
 
       {/* ── Rooms Table ────────────────────────────────────────────────────── */}
-      <TableContainer component={Paper}>
-        <Table>
-          <TableHead>
-            <TableRow>
-              <TableCell>Room Name</TableCell>
-              <TableCell>Building</TableCell>
-              <TableCell>Type</TableCell>
-              <TableCell>Capacity</TableCell>
-              <TableCell>Schedules Using Room</TableCell>
-              <TableCell align="right">Action</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {rooms.length === 0 ? (
+      <Paper>
+        <TableContainer>
+          <Table>
+            <TableHead>
               <TableRow>
-                <TableCell colSpan={6} align="center">
-                  No rooms created yet.
-                </TableCell>
+                <SortableTableCell label="Room Name" sortKey="name" sortBy={sort.sortBy} order={sort.order} onSort={handleSort} />
+                <SortableTableCell label="Building" sortKey="building" sortBy={sort.sortBy} order={sort.order} onSort={handleSort} />
+                <SortableTableCell label="Type" sortKey="type" sortBy={sort.sortBy} order={sort.order} onSort={handleSort} />
+                <SortableTableCell label="Capacity" sortKey="capacity" sortBy={sort.sortBy} order={sort.order} onSort={handleSort} />
+                <SortableTableCell label="Date Created" sortKey="createdAt" sortBy={sort.sortBy} order={sort.order} onSort={handleSort} />
+                <TableCell>Schedules Using Room</TableCell>
+                <TableCell align="right">Actions</TableCell>
               </TableRow>
-            ) : (
-              rooms.map((room) => (
-                <TableRow key={room.id}>
-                  <TableCell>{room.name}</TableCell>
-                  <TableCell>{room.building?.name || 'N/A'}</TableCell>
-                  <TableCell>{room.type}</TableCell>
-                  <TableCell>{room.capacity}</TableCell>
-                  <TableCell>{room._count?.schedules || 0}</TableCell>
-                  <TableCell align="right">
-                    <Button color="error" size="small" onClick={() => handleDelete(room.id)}>
-                      Delete
-                    </Button>
+            </TableHead>
+            <TableBody>
+              {rooms.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} align="center">
+                    No rooms created yet.
                   </TableCell>
                 </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </TableContainer>
+              ) : (
+                rooms.map((room) => (
+                  <TableRow key={room.id} hover>
+                    <TableCell>{room.name}</TableCell>
+                    <TableCell>{room.building?.name || 'N/A'}</TableCell>
+                    <TableCell>{room.type}</TableCell>
+                    <TableCell>{room.capacity}</TableCell>
+                    <TableCell>{formatDate(room.createdAt)}</TableCell>
+                    <TableCell>{room._count?.schedules || 0}</TableCell>
+                    <TableCell align="right">
+                      <Tooltip title="Edit">
+                        <IconButton size="small" onClick={() => openEdit(room)} sx={{ color: '#2563eb' }}>
+                          <EditIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Delete">
+                        <IconButton size="small" onClick={() => askDelete(room.id)} sx={{ color: '#ef4444' }}>
+                          <DeleteIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
 
-      {/* ── Add Room Modal ─────────────────────────────────────────────────── */}
+        <TablePagination
+          component="div"
+          count={pagination.total}
+          page={Math.max(pagination.page - 1, 0)}
+          onPageChange={(_, newPage) => fetchRooms(newPage + 1, pagination.pageSize)}
+          rowsPerPage={pagination.pageSize}
+          onRowsPerPageChange={(e) => fetchRooms(1, parseInt(e.target.value, 10))}
+          rowsPerPageOptions={[10, 25, 50]}
+        />
+      </Paper>
+
+      {/* ── Create / Edit Room Modal ───────────────────────────────────────── */}
       <Modal
         open={open}
-        onClose={() => setOpen(false)}
+        onClose={closeModal}
         sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
       >
         <Paper sx={{ p: 4, width: 420 }}>
           <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>
-            Create New Room
+            {editTarget ? 'Edit Room' : 'Create New Room'}
           </Typography>
 
           <Stack component="form" spacing={2} onSubmit={handleSubmit}>
@@ -179,9 +293,36 @@ export default function RoomManager() {
             </TextField>
 
             <Stack direction="row" spacing={1} justifyContent="flex-end">
-              <Button onClick={() => setOpen(false)}>Cancel</Button>
-              <Button type="submit" variant="contained">Save Room</Button>
+              <Button onClick={closeModal}>Cancel</Button>
+              <Button type="submit" variant="contained">
+                {editTarget ? 'Update Room' : 'Save Room'}
+              </Button>
             </Stack>
+          </Stack>
+        </Paper>
+      </Modal>
+
+      {/* ── Delete Confirmation Modal ──────────────────────────────────────── */}
+      <Modal open={deleteOpen} onClose={() => setDeleteOpen(false)}
+        sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <Paper sx={{ p: 4, width: 380, textAlign: 'center' }}>
+          <Typography variant="h6" fontWeight={800} sx={{ mb: 1 }}>
+            Delete Room?
+          </Typography>
+          <Typography color="text.secondary" sx={{ mb: 3 }}>
+            This only works if the room is not used in any schedule.
+          </Typography>
+          <Divider sx={{ mb: 3 }} />
+          <Stack direction="row" spacing={2} justifyContent="center">
+            <Button variant="outlined" onClick={() => setDeleteOpen(false)}
+              sx={{ borderRadius: '10px', textTransform: 'none', px: 3 }}>
+              Cancel
+            </Button>
+            <Button variant="contained" onClick={confirmDelete}
+              sx={{ bgcolor: '#ef4444', borderRadius: '10px', textTransform: 'none', px: 3,
+                '&:hover': { bgcolor: '#dc2626' } }}>
+              Delete Room
+            </Button>
           </Stack>
         </Paper>
       </Modal>

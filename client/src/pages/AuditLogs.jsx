@@ -34,20 +34,37 @@ const INITIAL_FILTERS = {
   sort: 'newest',
 };
 
-const StatCard = ({ title, value, icon, caption }) => (
-  <Paper sx={{ p: 2.5, borderRadius: '16px', border: '1px solid #e2e8f0' }}>
-    <Stack direction="row" justifyContent="space-between" alignItems="center">
-      <Typography variant="body2" sx={{ color: '#64748b', fontWeight: 700 }}>
+const StatCard = ({ title, value, icon, badgeColor, caption }) => (
+  <Paper
+    sx={{
+      p: 3,
+      borderRadius: '20px',
+      border: '1px solid #e2e8f0',
+      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.02)',
+      display: 'flex',
+      flexDirection: 'column',
+      justifyContent: 'space-between',
+      height: '100%',
+      minHeight: '160px',
+      bgcolor: 'background.paper',
+    }}
+  >
+    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+      <Typography variant="body2" sx={{ color: '#64748b', fontWeight: 600 }}>
         {title}
       </Typography>
-      {icon}
-    </Stack>
-    <Typography variant="h4" sx={{ mt: 1.5, fontWeight: 800, color: '#0f172a' }}>
-      {value}
-    </Typography>
-    <Typography variant="caption" sx={{ color: '#94a3b8' }}>
-      {caption}
-    </Typography>
+      <Box sx={{ p: 1, borderRadius: '12px', bgcolor: `${badgeColor}15`, color: badgeColor }}>
+        {icon}
+      </Box>
+    </Box>
+    <Box sx={{ mt: 2 }}>
+      <Typography variant="h3" fontWeight="800" sx={{ color: '#1e293b', letterSpacing: '-1px' }}>
+        {value}
+      </Typography>
+      <Typography variant="caption" sx={{ color: '#94a3b8' }}>
+        {caption}
+      </Typography>
+    </Box>
   </Paper>
 );
 
@@ -186,6 +203,7 @@ export default function AuditLogs() {
               variant="outlined"
               startIcon={<DownloadIcon />}
               onClick={() => handleExport('csv')}
+              sx={{ borderRadius: '12px', textTransform: 'none' }}
             >
               Export CSV
             </Button>
@@ -193,6 +211,7 @@ export default function AuditLogs() {
               variant="contained"
               startIcon={<TableChartIcon />}
               onClick={() => handleExport('excel')}
+              sx={{ bgcolor: '#2563eb', borderRadius: '12px', textTransform: 'none' }}
             >
               Export Excel
             </Button>
@@ -200,7 +219,7 @@ export default function AuditLogs() {
         </Stack>
 
         {error && (
-          <Alert severity="error" sx={{ mb: 2 }}>
+          <Alert severity="error" sx={{ mb: 2, borderRadius: '10px' }}>
             {error}
           </Alert>
         )}
@@ -210,7 +229,8 @@ export default function AuditLogs() {
             <StatCard
               title="Total Logs"
               value={stats.totalLogs}
-              icon={<DescriptionIcon sx={{ color: '#2563eb' }} />}
+              icon={<DescriptionIcon />}
+              badgeColor="#2563eb"
               caption="All recorded entries"
             />
           </Grid>
@@ -218,7 +238,8 @@ export default function AuditLogs() {
             <StatCard
               title="Today's Logs"
               value={stats.todaysLogs}
-              icon={<TableChartIcon sx={{ color: '#7c3aed' }} />}
+              icon={<TableChartIcon />}
+              badgeColor="#7c3aed"
               caption="Entries logged today"
             />
           </Grid>
@@ -226,7 +247,8 @@ export default function AuditLogs() {
             <StatCard
               title="Active Users Today"
               value={stats.activeUsersToday}
-              icon={<PeopleAltIcon sx={{ color: '#db2777' }} />}
+              icon={<PeopleAltIcon />}
+              badgeColor="#db2777"
               caption="Distinct actors"
             />
           </Grid>
@@ -234,7 +256,8 @@ export default function AuditLogs() {
             <StatCard
               title="Most Active Module"
               value={stats.mostActiveModule}
-              icon={<HubIcon sx={{ color: '#ea580c' }} />}
+              icon={<HubIcon />}
+              badgeColor="#ea580c"
               caption={`${stats.mostActiveModuleCount || 0} log entries today`}
             />
           </Grid>

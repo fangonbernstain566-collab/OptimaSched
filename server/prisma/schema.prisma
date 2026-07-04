@@ -48,6 +48,8 @@ model Teacher {
   userId          String         @unique
   departmentId    String
   maxTeachingLoad Int            @default(21)
+  isDeleted       Boolean        @default(false)
+  deletedAt       DateTime?
   availabilities  Availability[]
   schedules       Schedule[]
   department      Department     @relation(fields: [departmentId], references: [id])
@@ -75,6 +77,9 @@ model Room {
   capacity   Int
   type       RoomType   @default(LECTURE_ROOM)
   buildingId String
+  isDeleted  Boolean    @default(false)
+  deletedAt  DateTime?
+  createdAt  DateTime   @default(now())
   building   Building   @relation(fields: [buildingId], references: [id], onDelete: Cascade)
   schedules  Schedule[]
 }

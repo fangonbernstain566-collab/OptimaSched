@@ -1,0 +1,280 @@
+OptimaSched Backend — Codd's 12 Rules Compliance Report
+=========================================================
+
+Scope: U:\project-12\optimasched\server
+Stack: Node.js / Express, Prisma ORM, PostgreSQL
+
+Note: Codd's 12 Rules (0-12) describe requirements for the RDBMS ENGINE
+itself. The engine here is PostgreSQL, which already satisfies essentially
+all of them. What is actually useful to evaluate is whether the
+APPLICATION CODE (routes, schema, ORM usage) respects or undermines those
+principles. This report evaluates the app layer against each rule, citing
+specific files and line numbers.
+
+
+Rule 0 — Foundation Rule
+------------------------
+Status: COMPLIANT
+PostgreSQL + Prisma ORM, fully relational, typed models, foreign keys,
+unique constraints. No bypass of the relational engine for core data.
+
+
+Rule 1 — Information Rule (all data represented as values in table cells)
+--------------------------------------------------------------------------
+Status: VIOLATION
+
+schema.prisma:156
+    Schedule.enrolledStudents String[] @default([])
+
+Student enrollment is stored as a raw string array on the Schedule row
+instead of a proper Student/Enrollment relational join table. This means:
+  - No referential integrity to a real Student entity.
+  - No deduplication enforced by the database.
+  - The whole array is overwritten wholesale in:
+        src/routes/schedule.routes.js:480-521  (PUT /:id/students, full
+        array overwrite at line 505)
+
+This is exactly the kind of denormalized "value hiding a relationship"
+that Codd's Rule 1 prohibits — a relationship should be modeled as rows
+in a table, not packed into a single column.
+
+Compliant counterexample: AuditLog.metadata Json? (schema.prisma:127) is
+a legitimate schemaless log payload, not standing in for a relation, so
+it does not violate this rule.
+
+
+Rule 2 — Guaranteed Access Rule
+--------------------------------
+Status: COMPLIANT
+
+Every entity uses String @id @default(uuid()) plus unique keys:
+  - User.email (schema.prisma:18)
+  - Role.name, College.code, Department.code, Building.name, Subject.code,
+    Section.name, SchoolYear.name (all @unique)
+
+All routes address rows consistently via where: { id }, e.g.
+src/routes/teacher.routes.js, src/routes/room.routes.js,
+src/routes/schedule.routes.js.
+
+
+Rule 3 — Systematic Treatment of NULLs
+----------------------------------------
+Status: INCONSISTENT
+
+Nullable columns are modeled correctly at the schema level:
+  - Teacher.deletedAt DateTime? (schema.prisma:52)
+  - AuditLog.userId String?, etc. (schema.prisma:117-127)
+
+But application code mixes ?? (null-coalescing) and || (falsy-coalescing)
+inconsistently:
+
+  src/routes/teacher.routes.js:196-197
+      firstName: firstName?.trim() || existingTeacher.user.firstName,
+      lastName:  lastName?.trim()  || existingTeacher.user.lastName,
+
+  src/routes/room.routes.js:231 (analogous pattern)
+      name?.trim() || existingRoom.name
+
+  These silently treat a client-submitted empty string ('') the same as
+  "missing" — indistinguishable from NULL.
+
+Contrast with the CORRECT pattern:
+  src/utils/auditLog.js:19-21, 29-31
+      uses ?? null throughout — properly distinguishes NULL from falsy
+      values.
+
+Also:
+  src/routes/schedule.routes.js:124
+      filters using !val || String(val).trim() === ''
+      This collapses 0, '', null, and undefined into a single "missing"
+      bucket, which is unsound for a field like studentCount where 0 is
+      a legitimate value.
+
+
+Rule 4 — Active Online Catalog
+---------------------------------
+Status: SATISFIED (at engine level) / NEUTRAL AT APP LEVEL
+
+No app-level metadata endpoint exists, and no code queries
+information_schema or pg_catalog anywhere in src/. The app neither
+compliantly exposes nor subverts this rule — it simply relies on
+Postgres/Prisma's own catalog, which is fine since this guarantee is
+already met by the engine.
+
+
+Rule 5 — Comprehensive Data Sublanguage
+-------------------------------------------
+Status: COMPLIANT (one caveat)
+
+All CRUD operations go through Prisma's query API — a single comprehensive
+data sublanguage — rather than scattered raw SQL.
+
+Only one raw SQL statement exists in the entire codebase:
+  src/app.js:38
+      await prisma.$queryRaw`SELECT 1`
+  This is a harmless startup healthcheck.
+
+No $queryRawUnsafe or $executeRaw calls exist anywhere in src/routes/.
+
+
+Rule 6 — View Updating Rule
+-------------------------------
+Status: GAP (not a violation)
+
+No `view` blocks exist in schema.prisma at all — zero database views are
+defined, so there is nothing to assess for updatability. This is a missed
+opportunity rather than a subversion: reporting/read-heavy endpoints
+(e.g. dashboard aggregations) could use DB views but instead reimplement
+joins/filters in Prisma queries directly in route handlers.
+
+
+Rule 7 — High-Level Insert, Update, and Delete
+--------------------------------------------------
+Status: VIOLATION OF SPIRIT
+
+A repo-wide search found ZERO uses of updateMany / deleteMany / createMany
+anywhere in src/. Every mutation operates on exactly one row per call:
+
+  src/routes/schedule.routes.js:135   .create()          (single row)
+  src/routes/schedule.routes.js:219   .update({where:{id}})
+  src/routes/schedule.routes.js:392   .delete({where:{id}})
+
+Same singular, row-at-a-time pattern repeats in teacher.routes.js and
+room.routes.js. Even logically-batch operations, like replacing a
+schedule's enrolled students, are done as a single full-row update
+(schedule.routes.js:505) rather than set operations against a proper
+join table.
+
+This is entirely row-at-a-time application logic layered on top of an
+engine (Postgres) that is fully capable of set-based operations.
+
+
+Rule 8 — Physical Data Independence
+----------------------------------------
+Status: COMPLIANT
+
+src/config/prisma.js:21 centralizes the Prisma client (using
+@prisma/adapter-pg). Application code addresses data only through the
+ORM's model API — never through physical storage details such as file
+paths, page layout, or raw connection strings scattered across routes.
+
+
+Rule 9 — Logical Data Independence
+----------------------------------------
+Status: PARTIAL VIOLATION
+
+Two files bypass the central Prisma client and hold stale schema
+assumptions:
+
+  src/schedule/schedule.service.js:4
+      new PrismaClient()  (separate, ad-hoc instantiation)
+      references createdByUserId / updatedByUserId fields that no longer
+      exist in the current schema
+
+  src/services/scheduleConflict.service.js:3
+      new PrismaClient()  (separate, ad-hoc instantiation)
+      references ScheduleStatus values PUBLISHED / FOR_REVIEW / APPROVED,
+      which do not match the real enum:
+
+      schema.prisma:186-191
+          enum ScheduleStatus { PENDING, SCHEDULED, DRAFT, ACTIVE,
+          ARCHIVED }
+
+These two files are dead code (not wired into app.js or any active
+route), but they demonstrate hardcoded schema knowledge drifting out of
+sync with the live schema — exactly the fragility Rule 9 warns against.
+The live path (config/prisma.js) is fine and should be the only source
+of truth going forward; these two files are candidates for deletion.
+
+
+Rule 10 — Integrity Independence
+--------------------------------------
+Status: VIOLATION
+
+Referential-integrity guards are duplicated in application code instead
+of being left entirely to the database:
+
+  src/routes/teacher.routes.js:312-318
+      prisma.schedule.count({ where: { teacherId: id } })
+      — checked in JS before allowing a soft-delete
+
+  src/routes/room.routes.js:352-363
+      prisma.schedule.count({ where: { roomId: id } })
+      — same pattern
+
+These duplicate foreign-key constraints that ALREADY exist at the
+database level:
+
+  prisma/migrations/20260627121738_init/migration.sql:218
+      Schedule_teacherId_fkey ... ON DELETE RESTRICT
+  prisma/migrations/20260627121738_init/migration.sql:233
+      Schedule_roomId_fkey ... ON DELETE RESTRICT
+
+Worse, the HARD-DELETE endpoints skip the JS check entirely and rely
+solely on the DB constraint:
+  src/routes/teacher.routes.js:271-305  (DELETE /:id/permanent)
+  src/routes/room.routes.js:310-344     (DELETE /:id/permanent)
+
+So integrity enforcement is inconsistently split between the app layer
+and the DB layer, rather than being centralized in one place as Rule 10
+requires ("integrity constraints must be definable in the relational
+language and stored in the catalog, rather than embedded in individual
+applications").
+
+
+Rule 11 — Distribution Independence
+----------------------------------------
+Status: COMPLIANT / NOT APPLICABLE
+
+Single PostgreSQL instance, no sharding or distribution logic exists in
+the application code to evaluate. No violation observed.
+
+
+Rule 12 — Non-subversion Rule
+-----------------------------------
+Status: MOSTLY COMPLIANT, ONE GAP
+
+No $queryRawUnsafe or raw DML that bypasses Prisma's relational safety
+exists anywhere in the routes (only the harmless healthcheck ping at
+app.js:38).
+
+However, authorization is enforced ONLY in the application layer:
+
+  src/middleware/auth.js:38-48 (authorize)
+      allowedRoles.includes(req.user.role.name)
+      — a plain JS array-inclusion check, with zero database-level
+      backing (no Postgres Row-Level Security, no GRANT/REVOKE — confirmed
+      absent from all migration .sql files and from schema.prisma).
+
+The single Postgres connection role used by the pg.Pool
+(src/config/prisma.js:12-19) has unrestricted table access regardless of
+the authenticated app-user's role. This means a bug or bypass in the JS
+authorization logic has no database-level backstop — a subversion risk,
+even though no raw-SQL injection vector was actually found in the code.
+
+
+Summary
+=======
+Solid foundation: Rules 0, 2, 5, 8 are clean — the schema/ORM layer is
+well-structured and centralized.
+
+Practical gaps worth addressing, in priority order:
+  1. Rule 1  — Normalize Schedule.enrolledStudents (schema.prisma:156)
+               into a proper Student/Enrollment join table.
+  2. Rule 10 — Stop duplicating FK-integrity checks in JS
+               (teacher.routes.js:312-318, room.routes.js:352-363);
+               either rely on the DB constraint everywhere, or centralize
+               the check in one shared helper used by both soft- and
+               hard-delete paths.
+  3. Rule 3  — Standardize on ?? null instead of || for optional-field
+               fallbacks (teacher.routes.js:196-197, room.routes.js:231)
+               and fix the truthy-check bug for numeric fields like
+               studentCount (schedule.routes.js:124).
+  4. Rule 9  — Delete the dead, schema-drifted files
+               src/schedule/schedule.service.js and
+               src/services/scheduleConflict.service.js, which reference
+               fields and enum values that no longer exist.
+  5. Rule 12 — Consider whether role-based access should have any
+               database-level backstop (e.g. Postgres RLS) beyond the
+               current pure-JS authorize() middleware
+               (middleware/auth.js:38-48).

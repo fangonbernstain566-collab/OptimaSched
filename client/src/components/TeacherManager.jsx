@@ -1,41 +1,74 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
 import { useToast } from '../hooks/useToast';
 import Toast from '../components/Toast';
-import { Box, Typography, Button } from '@mui/material'; 
-import { Add as AddIcon } from '@mui/icons-material'; 
+import SortableTableCell from '../components/SortableTableCell';
+import {
+  Box, Typography, Button, Paper, Table, TableBody, TableCell,
+  TableContainer, TableHead, TableRow, Modal, TextField, Stack,
+  IconButton, Tooltip, Divider, CircularProgress, TablePagination,
+} from '@mui/material';
+import {
+  Add as AddIcon,
+  Edit as EditIcon,
+  Delete as DeleteIcon,
+  RestoreFromTrash as RestoreFromTrashIcon,
+} from '@mui/icons-material';
+
+const formatDate = (value) => {
+  if (!value) return '-';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? '-' : date.toLocaleDateString();
+};
+
+const INITIAL_FORM = {
+  firstName:       '',
+  lastName:        '',
+  email:           '',
+  maxTeachingLoad: 15,
+  departmentName:  'Information Technology Dept',
+};
 
 export default function TeacherManager() {
-  const [teachers, setTeachers] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [formData, setFormData] = useState({
-    firstName: '',
-    lastName: '',
-    email: '',
-    maxTeachingLoad: 15,
-    departmentName: 'Information Technology Dept'
-  });
+  const navigate = useNavigate();
+  const [teachers, setTeachers]     = useState([]);
+  const [loading, setLoading]       = useState(true);
+  const [open, setOpen]             = useState(false);
+  const [editTarget, setEditTarget] = useState(null);
+  const [formData, setFormData]     = useState(INITIAL_FORM);
+  const [deleteId, setDeleteId]     = useState(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [pagination, setPagination] = useState({ page: 1, pageSize: 10, total: 0, totalPages: 1 });
+  const [sort, setSort]             = useState({ sortBy: null, order: null });
 
   const { toast, showToast, hideToast } = useToast();
 
-  // ✅ FIX: this function didn't exist at all before — every request was sent
-  // with zero auth headers
   const getAuthHeaders = () => {
     const token = localStorage.getItem('optimasched_token');
     return token ? { headers: { Authorization: `Bearer ${token}` } } : {};
   };
 
   useEffect(() => {
-    fetchTeachers();
+    fetchTeachers(1, pagination.pageSize, sort);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const fetchTeachers = async () => {
+  const fetchTeachers = async (page = pagination.page, pageSize = pagination.pageSize, sortState = sort) => {
     try {
       setLoading(true);
-      const response = await axios.get('/api/teachers', getAuthHeaders());
+      const config = getAuthHeaders();
+      const response = await axios.get('/api/teachers', {
+        ...config,
+        params: {
+          page,
+          pageSize,
+          ...(sortState.sortBy ? { sortBy: sortState.sortBy, order: sortState.order } : {}),
+        },
+      });
       if (response.data.success) {
         setTeachers(response.data.data);
+        setPagination(response.data.pagination ?? { page, pageSize, total: response.data.data.length, totalPages: 1 });
       }
     } catch (error) {
       showToast(
@@ -47,116 +80,267 @@ export default function TeacherManager() {
     }
   };
 
+  // Cycles asc -> desc -> unsorted; resets to page 1 (a new sort order changes
+  // what belongs on "page 1"), but keeps the current page size.
+  const handleSort = (sortBy, order) => {
+    const nextSort = { sortBy, order };
+    setSort(nextSort);
+    fetchTeachers(1, pagination.pageSize, nextSort);
+  };
+
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const openCreate = () => {
+    setEditTarget(null);
+    setFormData(INITIAL_FORM);
+    setOpen(true);
+  };
+
+  const openEdit = (teacher) => {
+    setEditTarget(teacher);
+    setFormData({
+      firstName:       teacher.user?.firstName ?? '',
+      lastName:        teacher.user?.lastName ?? '',
+      email:           teacher.user?.email ?? '',
+      maxTeachingLoad: teacher.maxTeachingLoad ?? 15,
+      departmentName:  teacher.department?.name ?? '',
+    });
+    setOpen(true);
+  };
+
+  const closeModal = () => {
+    setOpen(false);
+    setEditTarget(null);
+    setFormData(INITIAL_FORM);
+  };
+
+  const handleCreate = async () => {
     try {
       const response = await axios.post('/api/teachers', formData, getAuthHeaders());
       if (response.data.success) {
         showToast(response.data.message ?? 'Instructor registered successfully!', 'success');
-        setIsModalOpen(false);
-        setFormData({
-          firstName: '', lastName: '', email: '',
-          maxTeachingLoad: 15, departmentName: 'Information Technology Dept',
-        });
-        fetchTeachers();
+        closeModal();
+        fetchTeachers(1, pagination.pageSize);
       }
     } catch (error) {
       showToast(error.response?.data?.message ?? 'Failed to save instructor profile.', 'error');
     }
   };
 
-  if (loading) return <div style={{ padding: '20px' }}>Loading faculty roster...</div>;
+  const handleUpdate = async () => {
+    try {
+      const response = await axios.put(`/api/teachers/${editTarget.id}`, formData, getAuthHeaders());
+      if (response.data.success) {
+        showToast(response.data.message ?? 'Instructor profile updated!', 'success');
+        closeModal();
+        fetchTeachers(pagination.page, pagination.pageSize);
+      }
+    } catch (error) {
+      showToast(error.response?.data?.message ?? 'Failed to update instructor profile.', 'error');
+    }
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    editTarget ? handleUpdate() : handleCreate();
+  };
+
+  const askDelete = (id) => { setDeleteId(id); setDeleteOpen(true); };
+
+  const confirmDelete = async () => {
+    try {
+      const response = await axios.delete(`/api/teachers/${deleteId}`, getAuthHeaders());
+      if (response.data.success) {
+        showToast(response.data.message ?? 'Teacher deleted successfully.', 'success');
+        setDeleteOpen(false);
+        setDeleteId(null);
+        const isLastRowOnPage = teachers.length === 1 && pagination.page > 1;
+        fetchTeachers(isLastRowOnPage ? pagination.page - 1 : pagination.page, pagination.pageSize);
+      }
+    } catch (error) {
+      showToast(error.response?.data?.message ?? 'Failed to delete teacher.', 'error');
+    }
+  };
 
   return (
-    <div style={{ padding: '24px', fontFamily: 'sans-serif' }}>
-
+    <Box sx={{ p: 4, minHeight: '100vh', bgcolor: '#f8fafc', mt: -4 }}>
       <Toast toast={toast} onClose={hideToast} />
 
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
-  <Typography variant="h4" fontWeight={800} sx={{ color: '#1e293b' }}>
-    OptimaSched Faculty Roster Directory
-  </Typography>
-  <Button
-    variant="contained"
-    startIcon={<AddIcon />}
-    onClick={() => setIsModalOpen(true)}
-    sx={{ bgcolor: '#2563eb', borderRadius: '12px', textTransform: 'none' }}
-  >
-    Register New Teacher
-  </Button>
-</Box>
+      <Box sx={{ maxWidth: '1300px', mx: 'auto' }}>
 
-      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-        <thead>
-          <tr style={{ background: '#f5f5f5', textAlign: 'left', borderBottom: '2px solid #ddd' }}>
-            <th style={{ padding: '12px' }}>Name</th>
-            <th style={{ padding: '12px' }}>Academic Email Address</th>
-            <th style={{ padding: '12px' }}>Assigned Department</th>
-            <th style={{ padding: '12px' }}>Max Units Load</th>
-          </tr>
-        </thead>
-        <tbody>
-          {teachers.length === 0 ? (
-            <tr>
-              <td colSpan="4" style={{ padding: '20px', textAlign: 'center', color: '#666' }}>
-                No active instructors registered in the database system yet.
-              </td>
-            </tr>
-          ) : (
-            teachers.map((t) => (
-              <tr key={t.id} style={{ borderBottom: '1px solid #eee' }}>
-                <td style={{ padding: '12px' }}><strong>{t.user?.firstName} {t.user?.lastName}</strong></td>
-                <td style={{ padding: '12px' }}>{t.user?.email}</td>
-                <td style={{ padding: '12px' }}>{t.department?.name || 'General Education'}</td>
-                <td style={{ padding: '12px' }}>{t.maxTeachingLoad} Units</td>
-              </tr>
-            ))
-          )}
-        </tbody>
-      </table>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+          <Box>
+            <Typography variant="h4" fontWeight={800} sx={{ color: '#1e293b' }}>
+              Manage Teachers
+            </Typography>
+            <Typography color="text.secondary">
+              Onboard and manage instructor profiles for schedule assignment.
+            </Typography>
+          </Box>
+          <Box sx={{ display: 'flex', gap: 1.25 }}>
+            <Button
+              variant="outlined"
+              startIcon={<RestoreFromTrashIcon />}
+              onClick={() => navigate('/teachers/recently-deleted')}
+              sx={{ borderRadius: '12px', textTransform: 'none' }}
+            >
+              Recently Deleted
+            </Button>
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={openCreate}
+              sx={{ bgcolor: '#2563eb', borderRadius: '12px', textTransform: 'none' }}
+            >
+              Register New Teacher
+            </Button>
+          </Box>
+        </Box>
 
-      {isModalOpen && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-          <form onSubmit={handleSubmit} style={{ background: '#fff', padding: '30px', borderRadius: '8px', width: '400px' }}>
-            <h3>Onboard New Academic Faculty</h3>
+        {loading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+            <CircularProgress />
+          </Box>
+        ) : (
+          <Paper sx={{ borderRadius: '16px' }}>
+            <TableContainer>
+              <Table>
+                <TableHead>
+                  <TableRow sx={{ bgcolor: '#f1f5f9' }}>
+                    <SortableTableCell label="Name" sortKey="lastName" sortBy={sort.sortBy} order={sort.order} onSort={handleSort} />
+                    <SortableTableCell label="Academic Email Address" sortKey="email" sortBy={sort.sortBy} order={sort.order} onSort={handleSort} />
+                    <SortableTableCell label="Assigned Department" sortKey="department" sortBy={sort.sortBy} order={sort.order} onSort={handleSort} />
+                    <SortableTableCell label="Max Units Load" sortKey="maxTeachingLoad" sortBy={sort.sortBy} order={sort.order} onSort={handleSort} />
+                    <SortableTableCell label="Date Registered" sortKey="createdAt" sortBy={sort.sortBy} order={sort.order} onSort={handleSort} />
+                    <TableCell align="right" sx={{ fontWeight: 'bold' }}>Actions</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {teachers.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} align="center" sx={{ py: 6, color: '#94a3b8' }}>
+                        No active instructors registered in the database system yet.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    teachers.map((t) => (
+                      <TableRow key={t.id} hover>
+                        <TableCell sx={{ fontWeight: 600 }}>
+                          {t.user?.firstName} {t.user?.lastName}
+                        </TableCell>
+                        <TableCell>{t.user?.email}</TableCell>
+                        <TableCell>{t.department?.name || 'General Education'}</TableCell>
+                        <TableCell>{t.maxTeachingLoad} Units</TableCell>
+                        <TableCell>{formatDate(t.user?.createdAt)}</TableCell>
+                        <TableCell align="right">
+                          <Tooltip title="Edit">
+                            <IconButton size="small" onClick={() => openEdit(t)} sx={{ color: '#2563eb' }}>
+                              <EditIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="Delete">
+                            <IconButton size="small" onClick={() => askDelete(t.id)} sx={{ color: '#ef4444' }}>
+                              <DeleteIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
 
-            <div style={{ marginBottom: '12px' }}>
-              <label style={{ display: 'block', marginBottom: '4px' }}>First Name</label>
-              <input type="text" name="firstName" value={formData.firstName} onChange={handleInputChange} style={{ width: '100%', padding: '8px' }} required />
-            </div>
+            <TablePagination
+              component="div"
+              count={pagination.total}
+              page={Math.max(pagination.page - 1, 0)}
+              onPageChange={(_, newPage) => fetchTeachers(newPage + 1, pagination.pageSize)}
+              rowsPerPage={pagination.pageSize}
+              onRowsPerPageChange={(e) => fetchTeachers(1, parseInt(e.target.value, 10))}
+              rowsPerPageOptions={[10, 25, 50]}
+            />
+          </Paper>
+        )}
 
-            <div style={{ marginBottom: '12px' }}>
-              <label style={{ display: 'block', marginBottom: '4px' }}>Last Name</label>
-              <input type="text" name="lastName" value={formData.lastName} onChange={handleInputChange} style={{ width: '100%', padding: '8px' }} required />
-            </div>
+        {/* Create / Edit Modal */}
+        <Modal open={open} onClose={closeModal}
+          sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Box sx={{
+            p: 4, bgcolor: 'background.paper', width: '100%',
+            maxWidth: '440px', borderRadius: '20px',
+          }}>
+            <Typography variant="h6" fontWeight={800} sx={{ mb: 3 }}>
+              {editTarget ? 'Edit Instructor Profile' : 'Onboard New Academic Faculty'}
+            </Typography>
 
-            <div style={{ marginBottom: '12px' }}>
-              <label style={{ display: 'block', marginBottom: '4px' }}>Email Address</label>
-              <input type="email" name="email" value={formData.email} onChange={handleInputChange} style={{ width: '100%', padding: '8px' }} required />
-            </div>
+            <form onSubmit={handleSubmit}>
+              <Stack spacing={2.5}>
+                <TextField
+                  label="First Name" name="firstName" fullWidth required
+                  value={formData.firstName} onChange={handleInputChange}
+                />
+                <TextField
+                  label="Last Name" name="lastName" fullWidth required
+                  value={formData.lastName} onChange={handleInputChange}
+                />
+                <TextField
+                  label="Email Address" name="email" type="email" fullWidth required
+                  value={formData.email} onChange={handleInputChange}
+                  disabled={!!editTarget}
+                  helperText={editTarget ? 'Email cannot be changed after registration.' : ''}
+                />
+                <TextField
+                  label="Target Department" name="departmentName" fullWidth required
+                  value={formData.departmentName} onChange={handleInputChange}
+                />
+                <TextField
+                  label="Max Teaching Unit Load" name="maxTeachingLoad" type="number" fullWidth required
+                  value={formData.maxTeachingLoad} onChange={handleInputChange}
+                  inputProps={{ min: 1 }}
+                />
 
-            <div style={{ marginBottom: '12px' }}>
-              <label style={{ display: 'block', marginBottom: '4px' }}>Target Department</label>
-              <input type="text" name="departmentName" value={formData.departmentName} onChange={handleInputChange} style={{ width: '100%', padding: '8px' }} required />
-            </div>
+                <Button fullWidth variant="contained" type="submit"
+                  sx={{ py: 1.5, bgcolor: '#2563eb', borderRadius: '10px', textTransform: 'none' }}>
+                  {editTarget ? 'Update Profile' : 'Save Profile'}
+                </Button>
+              </Stack>
+            </form>
+          </Box>
+        </Modal>
 
-            <div style={{ marginBottom: '20px' }}>
-              <label style={{ display: 'block', marginBottom: '4px' }}>Max Teaching Unit Load</label>
-              <input type="number" name="maxTeachingLoad" value={formData.maxTeachingLoad} onChange={handleInputChange} style={{ width: '100%', padding: '8px' }} required />
-            </div>
+        {/* Delete Confirmation Modal */}
+        <Modal open={deleteOpen} onClose={() => setDeleteOpen(false)}
+          sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Box sx={{
+            p: 4, bgcolor: 'background.paper', width: '100%',
+            maxWidth: '400px', borderRadius: '20px', textAlign: 'center',
+          }}>
+            <Typography variant="h6" fontWeight={800} sx={{ mb: 1 }}>
+              Delete Teacher?
+            </Typography>
+            <Typography color="text.secondary" sx={{ mb: 3 }}>
+              This cannot be undone. Teachers already assigned to schedules cannot be deleted.
+            </Typography>
+            <Divider sx={{ mb: 3 }} />
+            <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center' }}>
+              <Button variant="outlined" onClick={() => setDeleteOpen(false)}
+                sx={{ borderRadius: '10px', textTransform: 'none', px: 3 }}>
+                Cancel
+              </Button>
+              <Button variant="contained" onClick={confirmDelete}
+                sx={{ bgcolor: '#ef4444', borderRadius: '10px', textTransform: 'none', px: 3,
+                  '&:hover': { bgcolor: '#dc2626' } }}>
+                Delete Teacher
+              </Button>
+            </Box>
+          </Box>
+        </Modal>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-              <button type="button" onClick={() => setIsModalOpen(false)} style={{ padding: '8px 14px', background: '#e0e0e0', border: 'none', borderRadius: '4px' }}>Cancel</button>
-              <button type="submit" style={{ padding: '8px 14px', background: '#0070f3', color: '#fff', border: 'none', borderRadius: '4px' }}>Save Profile</button>
-            </div>
-          </form>
-        </div>
-      )}
-    </div>
+      </Box>
+    </Box>
   );
 }

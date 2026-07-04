@@ -54,7 +54,6 @@ const DashboardView = () => {
       <Box sx={{ maxWidth: '1200px', mx: 'auto' }}>
         <Box sx={{ mb: 4 }}>
           <Typography variant="h4" fontWeight="800" sx={{ color: '#1e293b', letterSpacing: '-1px' }}>Analytics Overview</Typography>
-          <Typography variant="body2" sx={{ color: '#64748b', mt: 0.5 }}>Real-time system data insights.</Typography>
         </Box>
 
         <Grid container spacing={3}>
