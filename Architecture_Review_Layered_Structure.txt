@@ -1,0 +1,163 @@
+OptimaSched Backend — Architectural Review
+=============================================
+Focus: Software Architecture Style (Hierarchical / Layered, Client-Server)
+
+Reference concepts used for this review:
+  Architecture Style      Meaning
+  ----------------------  ----------------------------------------------
+  Repository              Components share a central data store
+  MVC                     Separates model, view, and controller
+  Client-server           Clients request services from servers
+  Hierarchical            Organized in layers or levels
+  Pipe-filter             Data passes through processing stages
+
+Review focus: architecture affects scalability, maintainability,
+performance, and long-term system quality.
+
+
+Mapping the System
+-------------------
+This backend is a CLIENT-SERVER system (React client -> Express server ->
+PostgreSQL). The folder structure itself (routes/, controllers/,
+services/) signals an intended HIERARCHICAL / LAYERED style — a
+lightweight MVC variant where each layer has exactly one job:
+
+  Route      -> HTTP wiring (method + path + calls into the next layer)
+  Controller -> request validation / orchestration
+  Service    -> business logic + data access (Prisma)
+
+That layering exists on disk, but it is not actually followed
+consistently — and there is dead code left over from an abandoned
+attempt to introduce it properly.
+
+
+The Mistake
+-----------
+server/src/app.js:6-11 mounts six route files. Of those, only ONE
+(auditLog.routes.js) actually uses the full layer stack correctly:
+
+    route -> auditLog.controller.js -> auditLog.service.js -> Prisma
+
+The other three route files skip the layers entirely:
+
+  server/src/routes/schedule.routes.js
+  server/src/routes/teacher.routes.js
+  server/src/routes/room.routes.js
+
+These import `prisma` directly (e.g. teacher.routes.js:2) and inline all
+validation, business logic, and database queries straight into the route
+handler function.
+
+Meanwhile, the following controller/service files exist as if they were
+meant to hold that missing logic:
+
+  server/src/controllers/schedule.controller.js
+  server/src/controllers/teacher.controller.js
+  server/src/schedule/schedule.service.js
+  server/src/services/scheduleConflict.service.js
+
+A grep across the entire codebase confirms NONE of these four files are
+imported anywhere:
+
+  grep -rln "schedule.controller"       src/   -> no results
+  grep -rln "teacher.controller"        src/   -> no results
+  grep -rln "scheduleConflict.service"  src/   -> only referenced by
+                                                  schedule.service.js
+                                                  (itself also dead)
+
+All four files are unreachable dead code — apparently abandoned mid-
+refactor, either when someone started introducing the controller/service
+pattern for schedules and teachers and never finished wiring it in, or
+started reverting an earlier attempt and didn't finish deleting it.
+
+
+Why This Matters
+-----------------
+Maintainability:
+  A new contributor sees controllers/schedule.controller.js and
+  services/scheduleConflict.service.js and reasonably assumes that's
+  where schedule logic lives. They edit it — and nothing changes in the
+  running app, because the real logic is inline in schedule.routes.js.
+  This is a silent trap that wastes debugging time and erodes trust in
+  the codebase's structure.
+
+Consistency / Scalability:
+  One route (auditLog) demonstrates the team already knows how to do
+  proper layering correctly. Three others don't follow it. As the app
+  grows, new features are more likely to keep getting bolted directly
+  onto routes (following the majority pattern already present) rather
+  than the intended layered structure — compounding the drift over time.
+
+Using the prompt's own analogy: "Architecture is the city plan of a
+software system." Right now, part of this city has a grid layout and
+part doesn't — and there are buildings on the map (the four dead files)
+that were never actually built into anything reachable.
+
+
+Suggested Fix (Non-Drastic)
+----------------------------
+Do NOT refactor the three working routes (schedule/teacher/room) into
+the layered style right now. That would be a real rewrite of currently
+working, tested code, for zero behavioral gain — high risk, no reward.
+
+Instead, two small, safe steps:
+
+1. Delete the four orphaned files:
+     - server/src/controllers/schedule.controller.js
+     - server/src/controllers/teacher.controller.js
+     - server/src/schedule/schedule.service.js
+     - server/src/services/scheduleConflict.service.js
+
+   These are provably unreferenced (confirmed via app.js and grep
+   above), so deleting them cannot break anything currently running.
+   They additionally reference schema fields and enum values that no
+   longer exist in the current Prisma schema (e.g. createdByUserId,
+   stale ScheduleStatus values like PUBLISHED/FOR_REVIEW/APPROVED
+   instead of the real PENDING/SCHEDULED/DRAFT/ACTIVE/ARCHIVED), so they
+   would fail immediately if anyone ever did try to wire them in as-is.
+
+2. Leave a short note (in a CONTRIBUTING doc, or a comment at the top of
+   app.js) stating which pattern new routes should follow going forward.
+   Recommend the auditLog route -> controller -> service pattern as the
+   standard, since it's the one that is actually implemented correctly
+   today.
+
+
+Why the Fix Works
+-------------------
+- It removes a false signal without touching any running behavior. The
+  four files have zero inbound references anywhere in the codebase, so
+  removing them cannot regress the application — this was verified
+  directly via grep, not assumed.
+- It closes the gap between the folder structure's implied architecture
+  (routes/controllers/services => layered/hierarchical) and what the
+  code actually does. The next person who opens controllers/ will see
+  only real, wired-in code, instead of a decoy.
+- It is additive-free and fully reversible (git history preserves the
+  deleted files if anyone wants to revisit finishing that refactor
+  later), which satisfies "no drastic change."
+- It does not touch schedule.routes.js, teacher.routes.js, or
+  room.routes.js at all — the currently working, currently deployed
+  logic in those files is left completely alone.
+
+
+Summary
+=======
+Finding:   Backend architecture is nominally Hierarchical/layered
+           (routes -> controllers -> services -> Prisma) but only one
+           of four route groups (Audit Logs) actually follows that
+           pattern. Four dead files exist as remnants of an abandoned
+           attempt to apply the same pattern to Schedules and Teachers.
+
+Risk:      Low priority, but a real maintainability hazard — a
+           contributor could waste time editing code that has no effect,
+           or worse, assume it reflects current business rules when it
+           references a schema that no longer exists.
+
+Fix:       Delete the four orphaned files; document the intended
+           layering convention for future routes. No changes to any
+           currently working route.
+
+Status:    Analysis only — no files have been deleted or modified as
+           part of this review. Awaiting confirmation before performing
+           the cleanup.

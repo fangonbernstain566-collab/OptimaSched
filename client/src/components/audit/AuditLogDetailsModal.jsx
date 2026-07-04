@@ -5,8 +5,10 @@ import {
   DialogTitle,
   Divider,
   Grid,
+  IconButton,
   Typography,
 } from '@mui/material';
+import CloseIcon from '@mui/icons-material/Close';
 
 const Item = ({ label, value }) => (
   <>
@@ -21,8 +23,19 @@ const Item = ({ label, value }) => (
 
 export default function AuditLogDetailsModal({ open, onClose, log }) {
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
-      <DialogTitle>Audit Log Details</DialogTitle>
+    <Dialog
+      open={open}
+      onClose={onClose}
+      maxWidth="md"
+      fullWidth
+      PaperProps={{ sx: { borderRadius: '20px' } }}
+    >
+      <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontWeight: 800 }}>
+        Audit Log Details
+        <IconButton onClick={onClose} size="small">
+          <CloseIcon fontSize="small" />
+        </IconButton>
+      </DialogTitle>
       <DialogContent dividers>
         {!log ? (
           <Typography variant="body2" color="text.secondary">

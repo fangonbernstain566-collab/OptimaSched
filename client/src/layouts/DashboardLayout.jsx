@@ -5,8 +5,9 @@ import { useAuth } from '../context/AuthContext';
 import {
   Box, Drawer, AppBar, Toolbar, List, Typography, Divider,
   IconButton, ListItem, ListItemButton, ListItemIcon, ListItemText,
-  Avatar, Button,
+  Avatar, Button, Tooltip, useMediaQuery,
 } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
 import {
   Menu          as MenuIcon,
   Dashboard     as DashIcon,
@@ -15,6 +16,7 @@ import {
   RestoreFromTrash as TrashIcon,
   People        as TeacherIcon,
   MeetingRoom   as RoomIcon,
+  History       as AuditIcon,
   Logout        as LogoutIcon,
 } from '@mui/icons-material';
 
@@ -33,6 +35,7 @@ const C = {
 };
 
 const DRAWER_WIDTH = 260;
+const COLLAPSED_WIDTH = 76;
 
 // ─── Nav config ───────────────────────────────────────────────────────────────
 // roles: plain strings matching what AuthContext.login() saves (user.role as string,
@@ -51,23 +54,18 @@ const NAV_ITEMS = [
     roles: ['ADMINISTRATOR', 'REGISTRAR_SCHEDULER'],
   },
   {
-    text:  'Check Schedules',
-    path:  '/my-schedules',
-    icon:  <SchedIcon fontSize="small" />,
-    roles: ['INSTRUCTOR'],
-  },
-  {
     text:  'Schedule Plotter',
     path:  '/schedules/plotter',
     icon:  <PlotterIcon fontSize="small" />,
     roles: ['ADMINISTRATOR', 'REGISTRAR_SCHEDULER'],
   },
   {
-    text:  'Recently Deleted',
-    path:  '/schedules/recently-deleted',
-    icon:  <TrashIcon fontSize="small" />,
+    text:  'Manage Schedules',
+    path:  '/schedules',
+    icon:  <SchedIcon fontSize="small" />,
     roles: ['ADMINISTRATOR', 'REGISTRAR_SCHEDULER'],
   },
+ 
   {
     text:  'Manage Teachers',
     path:  '/teachers',
@@ -80,16 +78,39 @@ const NAV_ITEMS = [
     icon:  <RoomIcon fontSize="small" />,
     roles: ['ADMINISTRATOR'],
   },
+   {
+    text:  'Recently Deleted',
+    path:  '/schedules/recently-deleted',
+    icon:  <TrashIcon fontSize="small" />,
+    roles: ['ADMINISTRATOR', 'REGISTRAR_SCHEDULER'],
+  },
+  {
+    text:  'Audit Logs',
+    path:  '/audit-logs',
+    icon:  <AuditIcon fontSize="small" />,
+    roles: ['ADMINISTRATOR'],
+  },
 ];
 
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function DashboardLayout() {
-  const { user, logout }            = useAuth();
-  const navigate                    = useNavigate();
-  const location                    = useLocation();
-  const [mobileOpen, setMobileOpen] = useState(false);
+  const { user, logout }              = useAuth();
+  const navigate                      = useNavigate();
+  const location                      = useLocation();
+  const theme                         = useTheme();
+  const isDesktop                     = useMediaQuery(theme.breakpoints.up('md'));
+  const [mobileOpen, setMobileOpen]   = useState(false);
+  const [collapsed, setCollapsed]     = useState(false);
 
-  const handleDrawerToggle = () => setMobileOpen((prev) => !prev);
+  const handleDrawerToggle = () => {
+    if (isDesktop) {
+      setCollapsed((prev) => !prev);
+    } else {
+      setMobileOpen((prev) => !prev);
+    }
+  };
+
+  const drawerWidth = collapsed ? COLLAPSED_WIDTH : DRAWER_WIDTH;
 
   // user.role is a plain string from AuthContext ("ADMINISTRATOR", etc.)
   // NOT a Prisma object — never use user?.role?.name here
@@ -115,8 +136,8 @@ export default function DashboardLayout() {
       }}
     >
       {/* ── Logo ──────────────────────────────────────────────────────────── */}
-      <Box sx={{ px: 3, pt: 3.5, pb: 3 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+      <Box sx={{ px: collapsed ? 0 : 3, pt: 3.5, pb: 3 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, justifyContent: collapsed ? 'center' : 'flex-start' }}>
           {/* ✅ FIX: removed duplicate CalendarIcon import — SchedIcon is the same icon */}
           <Box
             sx={{
@@ -133,39 +154,42 @@ export default function DashboardLayout() {
           >
             <SchedIcon sx={{ color: '#fff', fontSize: 18 }} />
           </Box>
-          <Box>
-            <Typography
-              sx={{
-                color:         'rgba(255,255,255,0.5)',
-                fontSize:      '0.6rem',
-                fontWeight:    700,
-                letterSpacing: '0.18em',
-                textTransform: 'uppercase',
-                lineHeight:    1,
-              }}
-            >
-              PCLU
-            </Typography>
-            <Typography
-              sx={{ color: '#fff', fontSize: '0.9rem', fontWeight: 700, lineHeight: 1.3 }}
-            >
-              OptimaSched
-            </Typography>
-          </Box>
+          {!collapsed && (
+            <Box>
+              <Typography
+                sx={{
+                  color:         'rgba(255,255,255,0.5)',
+                  fontSize:      '0.6rem',
+                  fontWeight:    700,
+                  letterSpacing: '0.18em',
+                  textTransform: 'uppercase',
+                  lineHeight:    1,
+                }}
+              >
+                PCLU
+              </Typography>
+              <Typography
+                sx={{ color: '#fff', fontSize: '0.9rem', fontWeight: 700, lineHeight: 1.3 }}
+              >
+                OptimaSched
+              </Typography>
+            </Box>
+          )}
         </Box>
       </Box>
 
       {/* ── User block ────────────────────────────────────────────────────── */}
-      <Box sx={{ px: 3, pb: 3 }}>
+      <Box sx={{ px: collapsed ? 1 : 3, pb: 3 }}>
         <Box
           sx={{
-            display:      'flex',
-            alignItems:   'center',
-            gap:          1.5,
-            p:            1.5,
-            borderRadius: '10px',
-            bgcolor:      'rgba(255,255,255,0.06)',
-            border:       '1px solid rgba(255,255,255,0.08)',
+            display:        'flex',
+            alignItems:     'center',
+            justifyContent: collapsed ? 'center' : 'flex-start',
+            gap:            1.5,
+            p:              1.5,
+            borderRadius:   '10px',
+            bgcolor:        'rgba(255,255,255,0.06)',
+            border:         '1px solid rgba(255,255,255,0.08)',
           }}
         >
           <Avatar
@@ -180,45 +204,49 @@ export default function DashboardLayout() {
           >
             {user?.firstName?.[0]?.toUpperCase() ?? 'U'}
           </Avatar>
-          <Box sx={{ minWidth: 0 }}>
-            <Typography
-              noWrap
-              sx={{ color: '#fff', fontSize: '0.8rem', fontWeight: 600, lineHeight: 1.3 }}
-            >
-              {user?.firstName} {user?.lastName}
-            </Typography>
-            <Typography
-              noWrap
-              sx={{
-                color:         C.accent,
-                fontSize:      '0.65rem',
-                fontWeight:    600,
-                letterSpacing: '0.06em',
-                textTransform: 'lowercase',
-              }}
-            >
-              {userRole.replace(/_/g, ' ').toLowerCase()}
-            </Typography>
-          </Box>
+          {!collapsed && (
+            <Box sx={{ minWidth: 0 }}>
+              <Typography
+                noWrap
+                sx={{ color: '#fff', fontSize: '0.8rem', fontWeight: 600, lineHeight: 1.3 }}
+              >
+                {user?.firstName} {user?.lastName}
+              </Typography>
+              <Typography
+                noWrap
+                sx={{
+                  color:         C.accent,
+                  fontSize:      '0.65rem',
+                  fontWeight:    600,
+                  letterSpacing: '0.06em',
+                  textTransform: 'lowercase',
+                }}
+              >
+                {userRole.replace(/_/g, ' ').toLowerCase()}
+              </Typography>
+            </Box>
+          )}
         </Box>
       </Box>
 
       <Divider sx={{ borderColor: 'rgba(255,255,255,0.07)', mx: 3, mb: 2 }} />
 
       {/* ── Nav label ─────────────────────────────────────────────────────── */}
-      <Typography
-        sx={{
-          px:            3,
-          mb:            1,
-          color:         'rgba(255,255,255,0.3)',
-          fontSize:      '0.6rem',
-          fontWeight:    700,
-          letterSpacing: '0.14em',
-          textTransform: 'uppercase',
-        }}
-      >
-        Navigation
-      </Typography>
+      {!collapsed && (
+        <Typography
+          sx={{
+            px:            3,
+            mb:            1,
+            color:         'rgba(255,255,255,0.3)',
+            fontSize:      '0.6rem',
+            fontWeight:    700,
+            letterSpacing: '0.14em',
+            textTransform: 'uppercase',
+          }}
+        >
+          Navigation
+        </Typography>
+      )}
 
       {/* ── Nav items ─────────────────────────────────────────────────────── */}
       <List sx={{ flexGrow: 1, px: 1.5, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
@@ -227,50 +255,51 @@ export default function DashboardLayout() {
 
           const isActive = location.pathname === item.path;
 
-          return (
-            <ListItem key={item.text} disablePadding>
-              <ListItemButton
-                onClick={() => { navigate(item.path); setMobileOpen(false); }}
-                selected={isActive}
+          const button = (
+            <ListItemButton
+              onClick={() => { navigate(item.path); setMobileOpen(false); }}
+              selected={isActive}
+              sx={{
+                borderRadius:           '8px',
+                py:                     1,
+                px:                     1.5,
+                justifyContent:         collapsed ? 'center' : 'flex-start',
+                position:               'relative',
+                transition:             'all 0.15s ease',
+                bgcolor:                isActive ? C.accentLight : 'transparent',
+                '&:hover':              { bgcolor: isActive ? C.accentLight : C.sidebarHover },
+                '&.Mui-selected':       { bgcolor: C.accentLight },
+                '&.Mui-selected:hover': { bgcolor: C.accentLight },
+              }}
+            >
+              {/* Gold left-edge active indicator */}
+              {isActive && (
+                <Box
+                  sx={{
+                    position:     'absolute',
+                    left:         0,
+                    top:          '20%',
+                    bottom:       '20%',
+                    width:        3,
+                    borderRadius: '0 3px 3px 0',
+                    bgcolor:      C.accent,
+                  }}
+                />
+              )}
+
+              {/* ✅ FIX: icon was defined in NAV_ITEMS but never rendered */}
+              <ListItemIcon
                 sx={{
-                  borderRadius:           '8px',
-                  py:                     1,
-                  px:                     1.5,
-                  position:               'relative',
-                  transition:             'all 0.15s ease',
-                  bgcolor:                isActive ? C.accentLight : 'transparent',
-                  '&:hover':              { bgcolor: isActive ? C.accentLight : C.sidebarHover },
-                  '&.Mui-selected':       { bgcolor: C.accentLight },
-                  '&.Mui-selected:hover': { bgcolor: C.accentLight },
+                  minWidth:   collapsed ? 0 : 36,
+                  color:      isActive ? C.accent : C.sidebarText,
+                  transition: 'color 0.15s',
                 }}
               >
-                {/* Gold left-edge active indicator */}
-                {isActive && (
-                  <Box
-                    sx={{
-                      position:     'absolute',
-                      left:         0,
-                      top:          '20%',
-                      bottom:       '20%',
-                      width:        3,
-                      borderRadius: '0 3px 3px 0',
-                      bgcolor:      C.accent,
-                    }}
-                  />
-                )}
+                {item.icon}
+              </ListItemIcon>
 
-                {/* ✅ FIX: icon was defined in NAV_ITEMS but never rendered */}
-                <ListItemIcon
-                  sx={{
-                    minWidth: 36,
-                    color:    isActive ? C.accent : C.sidebarText,
-                    transition: 'color 0.15s',
-                  }}
-                >
-                  {item.icon}
-                </ListItemIcon>
-
-                {/* ✅ Uses sx selector — avoids MUI ignoring color in primaryTypographyProps */}
+              {/* ✅ Uses sx selector — avoids MUI ignoring color in primaryTypographyProps */}
+              {!collapsed && (
                 <ListItemText
                   primary={item.text}
                   sx={{
@@ -282,7 +311,17 @@ export default function DashboardLayout() {
                     },
                   }}
                 />
-              </ListItemButton>
+              )}
+            </ListItemButton>
+          );
+
+          return (
+            <ListItem key={item.text} disablePadding>
+              {collapsed ? (
+                <Tooltip title={item.text} placement="right">
+                  <Box sx={{ width: '100%' }}>{button}</Box>
+                </Tooltip>
+              ) : button}
             </ListItem>
           );
         })}
@@ -291,27 +330,30 @@ export default function DashboardLayout() {
       {/* ── Logout ────────────────────────────────────────────────────────── */}
       <Box sx={{ p: 2 }}>
         <Divider sx={{ borderColor: 'rgba(255,255,255,0.07)', mb: 2 }} />
-        <Button
-          fullWidth
-          onClick={handleLogout}
-          startIcon={<LogoutIcon />}
-          sx={{
-            justifyContent: 'flex-start',
-            px:             1.5,
-            py:             1,
-            borderRadius:   '8px',
-            color:          'rgba(255,255,255,0.4)',
-            fontSize:       '0.825rem',
-            fontWeight:     500,
-            textTransform:  'none',
-            '&:hover': {
-              bgcolor: 'rgba(239, 68, 68, 0.12)',
-              color:   '#f87171',
-            },
-          }}
-        >
-          Disconnect Session
-        </Button>
+        <Tooltip title={collapsed ? 'Disconnect Session' : ''} placement="right">
+          <Button
+            fullWidth
+            onClick={handleLogout}
+            startIcon={collapsed ? null : <LogoutIcon />}
+            sx={{
+              justifyContent: collapsed ? 'center' : 'flex-start',
+              minWidth:       0,
+              px:             1.5,
+              py:             1,
+              borderRadius:   '8px',
+              color:          'rgba(255,255,255,0.4)',
+              fontSize:       '0.825rem',
+              fontWeight:     500,
+              textTransform:  'none',
+              '&:hover': {
+                bgcolor: 'rgba(239, 68, 68, 0.12)',
+                color:   '#f87171',
+              },
+            }}
+          >
+            {collapsed ? <LogoutIcon fontSize="small" /> : 'Disconnect Session'}
+          </Button>
+        </Tooltip>
       </Box>
     </Box>
   );
@@ -326,12 +368,16 @@ export default function DashboardLayout() {
         position="fixed"
         elevation={0}
         sx={{
-          width:        { md: `calc(100% - ${DRAWER_WIDTH}px)` },
-          ml:           { md: `${DRAWER_WIDTH}px` },
+          width:        { md: `calc(100% - ${drawerWidth}px)` },
+          ml:           { md: `${drawerWidth}px` },
           bgcolor:      C.card,
           color:        C.primary,
           borderBottom: `1px solid ${C.border}`,
           boxShadow:    '0 1px 12px rgba(27,43,94,0.06)',
+          transition:   theme.transitions.create(['width', 'margin'], {
+            easing:   theme.transitions.easing.sharp,
+            duration: theme.transitions.duration.leavingScreen,
+          }),
         }}
       >
         <Toolbar sx={{ gap: 2 }}>
@@ -339,7 +385,7 @@ export default function DashboardLayout() {
             color="inherit"
             edge="start"
             onClick={handleDrawerToggle}
-            sx={{ mr: 1, display: { md: 'none' } }}
+            sx={{ mr: 1 }}
           >
             <MenuIcon />
           </IconButton>
@@ -390,7 +436,7 @@ export default function DashboardLayout() {
       </AppBar>
 
       {/* ── Sidebar drawers ───────────────────────────────────────────────── */}
-      <Box component="nav" sx={{ width: { md: DRAWER_WIDTH }, flexShrink: { md: 0 } }}>
+      <Box component="nav" sx={{ width: { md: drawerWidth }, flexShrink: { md: 0 } }}>
         {/* Mobile — temporary */}
         <Drawer
           variant="temporary"
@@ -413,9 +459,14 @@ export default function DashboardLayout() {
             display: { xs: 'none', md: 'block' },
             '& .MuiDrawer-paper': {
               boxSizing: 'border-box',
-              width:     DRAWER_WIDTH,
+              width:     drawerWidth,
               border:    'none',
               boxShadow: '4px 0 24px rgba(27,43,94,0.12)',
+              overflowX: 'hidden',
+              transition: theme.transitions.create('width', {
+                easing:   theme.transitions.easing.sharp,
+                duration: theme.transitions.duration.leavingScreen,
+              }),
             },
           }}
         >
@@ -430,10 +481,14 @@ export default function DashboardLayout() {
           flexGrow:  1,
           p:         3,
           boxSizing: 'border-box',
-          width:     { md: `calc(100% - ${DRAWER_WIDTH}px)` },
+          width:     { md: `calc(100% - ${drawerWidth}px)` },
           minHeight: '100vh',
           // ✅ FIX: was C.background (beige) — explicit white for all page content
           bgcolor:   C.card,
+          transition: theme.transitions.create('width', {
+            easing:   theme.transitions.easing.sharp,
+            duration: theme.transitions.duration.leavingScreen,
+          }),
         }}
       >
         <Toolbar /> {/* Spacer — keeps content below the fixed AppBar */}

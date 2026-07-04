@@ -10,6 +10,8 @@ import RoomManager from './components/RoomManager';
 import ManageSchedules from './pages/ManageSchedules';
 import SchedulePlotter from './pages/SchedulePlotter';
 import RecentlyDeletedSchedules from './pages/RecentlyDeletedSchedules';
+import RecentlyDeletedTeachers from './pages/RecentlyDeletedTeachers';
+import RecentlyDeletedRooms from './pages/RecentlyDeletedRooms';
 import AuditLogs from './pages/AuditLogs';
 import InstructorSchedules from './pages/InstructorSchedules';
 
@@ -72,10 +74,28 @@ export default function App() {
         />
 
         <Route
+          path="teachers/recently-deleted"
+          element={
+            <ProtectedRoute allowedRoles={['ADMINISTRATOR']}>
+              <RecentlyDeletedTeachers />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
           path="rooms"
           element={
             <ProtectedRoute allowedRoles={['ADMINISTRATOR']}>
               <RoomManager />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="rooms/recently-deleted"
+          element={
+            <ProtectedRoute allowedRoles={['ADMINISTRATOR']}>
+              <RecentlyDeletedRooms />
             </ProtectedRoute>
           }
         />

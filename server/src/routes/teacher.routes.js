@@ -7,18 +7,59 @@ import { logAudit } from '../utils/auditLog.js';
 const router = Router();
 router.use(authenticate); // ✅ makes req.user available below
 
-// ─── GET /: Fetch all registered teachers ────────────────────────────────────
+// Whitelist of columns the UI is allowed to sort by, mapped to the Prisma
+// orderBy shape needed to reach them (some live on the related User/Department).
+// Keeping this as an explicit map (rather than trusting req.query.sortBy
+// directly) prevents arbitrary/unsupported field names from being handed to Prisma.
+const TEACHER_SORT_MAP = {
+  firstName:       (order) => ({ user: { firstName: order } }),
+  lastName:        (order) => ({ user: { lastName: order } }),
+  email:           (order) => ({ user: { email: order } }),
+  department:      (order) => ({ department: { name: order } }),
+  maxTeachingLoad: (order) => ({ maxTeachingLoad: order }),
+  createdAt:       (order) => ({ user: { createdAt: order } }),
+};
+
+// ─── GET /: Fetch registered teachers ─────────────────────────────────────────
+// Pagination is opt-in via ?page=. Omitting it preserves the old behavior
+// (full array) for existing callers that don't expect a paginated shape.
 router.get('/', async (req, res) => {
   try {
-    const teachers = await prisma.teacher.findMany({
-      include: {
-        user:       { select: { id: true, firstName: true, lastName: true, email: true } },
-        department: true,
-      },
-      orderBy: { user: { lastName: 'asc' } },
-    });
+    const where = { isDeleted: false };
+    const include = {
+      user:       { select: { id: true, firstName: true, lastName: true, email: true, createdAt: true } },
+      department: true,
+    };
+    const defaultOrderBy = { user: { lastName: 'asc' } };
 
-    return res.json({ success: true, data: teachers });
+    if (req.query.page === undefined) {
+      const teachers = await prisma.teacher.findMany({ where, include, orderBy: defaultOrderBy });
+      return res.json({ success: true, data: teachers });
+    }
+
+    const page     = Math.max(parseInt(req.query.page, 10) || 1, 1);
+    const pageSize = Math.min(Math.max(parseInt(req.query.pageSize, 10) || 10, 1), 100);
+    const skip     = (page - 1) * pageSize;
+
+    const order   = req.query.order === 'desc' ? 'desc' : 'asc';
+    const sortMap = TEACHER_SORT_MAP[req.query.sortBy];
+    const orderBy = sortMap ? sortMap(order) : defaultOrderBy;
+
+    const [total, teachers] = await Promise.all([
+      prisma.teacher.count({ where }),
+      prisma.teacher.findMany({ where, include, orderBy, skip, take: pageSize }),
+    ]);
+
+    return res.json({
+      success: true,
+      data: teachers,
+      pagination: {
+        page,
+        pageSize,
+        total,
+        totalPages: Math.ceil(total / pageSize) || 1,
+      },
+    });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
   }
@@ -28,7 +69,7 @@ router.get('/', async (req, res) => {
 router.get('/all', async (req, res) => {
   try {
     const teachers = await prisma.teacher.findMany({
-      where: { user: { role: { name: 'INSTRUCTOR' } } },
+      where: { isDeleted: false, user: { role: { name: 'INSTRUCTOR' } } },
       include: {
         user:       { select: { id: true, firstName: true, lastName: true, email: true } },
         department: true,
@@ -36,6 +77,24 @@ router.get('/all', async (req, res) => {
     });
 
     return res.json({ success: true, data: teachers });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// ─── GET /recently-deleted: List soft-deleted teachers ───────────────────────
+router.get('/recently-deleted', async (req, res) => {
+  try {
+    const deletedTeachers = await prisma.teacher.findMany({
+      where: { isDeleted: true },
+      include: {
+        user:       { select: { id: true, firstName: true, lastName: true, email: true } },
+        department: true,
+      },
+      orderBy: { deletedAt: 'desc' },
+    });
+
+    return res.json({ success: true, data: deletedTeachers });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
   }
@@ -132,6 +191,201 @@ router.post('/', async (req, res) => {
       success: false,
       message: `Database Insertion Failure: ${error.message}`,
     });
+  }
+});
+
+// ─── PUT /:id: Update a teacher's profile ────────────────────────────────────
+router.put('/:id', async (req, res) => {
+  const { id } = req.params;
+  const { firstName, lastName, maxTeachingLoad, departmentName } = req.body;
+
+  try {
+    const existingTeacher = await prisma.teacher.findUnique({
+      where: { id },
+      include: { user: true, department: true },
+    });
+
+    if (!existingTeacher) {
+      return res.status(404).json({ success: false, message: 'Teacher not found.' });
+    }
+
+    let departmentId = existingTeacher.departmentId;
+    if (departmentName && departmentName !== existingTeacher.department.name) {
+      let targetDept = await prisma.department.findFirst({ where: { name: departmentName } });
+      if (!targetDept) {
+        let primaryCollege = await prisma.college.findFirst();
+        if (!primaryCollege) {
+          primaryCollege = await prisma.college.create({
+            data: { name: 'College of Information Technology', code: 'CIT' },
+          });
+        }
+        targetDept = await prisma.department.create({
+          data: {
+            name: departmentName,
+            code: departmentName.split(' ').map((w) => w[0]).join('').toUpperCase(),
+            collegeId: primaryCollege.id,
+          },
+        });
+      }
+      departmentId = targetDept.id;
+    }
+
+    await prisma.user.update({
+      where: { id: existingTeacher.userId },
+      data: {
+        firstName: firstName?.trim() || existingTeacher.user.firstName,
+        lastName:  lastName?.trim()  || existingTeacher.user.lastName,
+      },
+    });
+
+    const updatedTeacher = await prisma.teacher.update({
+      where: { id },
+      data: {
+        departmentId,
+        maxTeachingLoad: maxTeachingLoad !== undefined
+          ? parseInt(maxTeachingLoad, 10) || existingTeacher.maxTeachingLoad
+          : existingTeacher.maxTeachingLoad,
+      },
+      include: { user: true, department: true },
+    });
+
+    await logAudit(req, {
+      action: 'TEACHER_UPDATE',
+      module: 'TEACHER_MANAGEMENT',
+      description: `${req.user.firstName} updated teacher ${updatedTeacher.user.firstName} ${updatedTeacher.user.lastName}.`,
+      targetRecordId: updatedTeacher.id,
+      targetRecordName: `${updatedTeacher.user.firstName} ${updatedTeacher.user.lastName}`,
+      metadata: { department: updatedTeacher.department.name, maxTeachingLoad: updatedTeacher.maxTeachingLoad },
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: 'Instructor profile updated successfully.',
+      data: updatedTeacher,
+    });
+  } catch (error) {
+    console.error('❌ Error updating teacher:', error);
+    return res.status(500).json({ success: false, message: `Teacher update failed: ${error.message}` });
+  }
+});
+
+// ─── PATCH /:id/restore: Restore a soft-deleted teacher ──────────────────────
+router.patch('/:id/restore', async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const existing = await prisma.teacher.findUnique({
+      where: { id },
+      include: { user: true },
+    });
+
+    if (!existing) {
+      return res.status(404).json({ success: false, message: 'Teacher not found.' });
+    }
+    if (!existing.isDeleted) {
+      return res.status(400).json({ success: false, message: 'Teacher is already active.' });
+    }
+
+    const restored = await prisma.teacher.update({
+      where: { id },
+      data: { isDeleted: false, deletedAt: null },
+      include: { user: true, department: true },
+    });
+
+    await logAudit(req, {
+      action: 'TEACHER_RESTORE',
+      module: 'TEACHER_MANAGEMENT',
+      description: `${req.user.firstName} restored teacher ${existing.user.firstName} ${existing.user.lastName}.`,
+      targetRecordId: id,
+      targetRecordName: `${existing.user.firstName} ${existing.user.lastName}`,
+    });
+
+    return res.json({ success: true, message: 'Teacher restored successfully!', data: restored });
+  } catch (error) {
+    console.error('❌ Error restoring teacher:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// ─── DELETE /:id/permanent: Hard-delete a soft-deleted teacher ───────────────
+router.delete('/:id/permanent', async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const target = await prisma.teacher.findUnique({
+      where: { id },
+      include: { user: true },
+    });
+
+    if (!target) {
+      return res.status(404).json({ success: false, message: 'Teacher not found.' });
+    }
+    if (!target.isDeleted) {
+      return res.status(400).json({
+        success: false,
+        message: 'Teacher must be soft-deleted first before permanent deletion.',
+      });
+    }
+
+    await prisma.teacher.delete({ where: { id } });
+
+    await logAudit(req, {
+      action: 'TEACHER_PERMANENT_DELETE',
+      module: 'TEACHER_MANAGEMENT',
+      description: `${req.user.firstName} permanently deleted teacher ${target.user.firstName} ${target.user.lastName}.`,
+      targetRecordId: id,
+      targetRecordName: `${target.user.firstName} ${target.user.lastName}`,
+    });
+
+    return res.json({ success: true, message: 'Teacher permanently deleted.' });
+  } catch (error) {
+    console.error('❌ Error permanently deleting teacher:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// ─── DELETE /:id: Soft-delete a teacher only if not tied to any schedule ─────
+router.delete('/:id', async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const scheduleCount = await prisma.schedule.count({ where: { teacherId: id } });
+    if (scheduleCount > 0) {
+      return res.status(409).json({
+        success: false,
+        message: 'Cannot delete this teacher because they are already assigned to schedules.',
+      });
+    }
+
+    const teacherToDelete = await prisma.teacher.findUnique({
+      where: { id },
+      include: { user: true },
+    });
+
+    if (!teacherToDelete) {
+      return res.status(404).json({ success: false, message: 'Teacher not found.' });
+    }
+    if (teacherToDelete.isDeleted) {
+      return res.status(400).json({ success: false, message: 'Teacher is already deleted.' });
+    }
+
+    await prisma.teacher.update({
+      where: { id },
+      data: { isDeleted: true, deletedAt: new Date() },
+    });
+
+    await logAudit(req, {
+      action: 'TEACHER_SOFT_DELETE',
+      module: 'TEACHER_MANAGEMENT',
+      description: `${req.user.firstName} moved teacher ${teacherToDelete.user.firstName} ${teacherToDelete.user.lastName} to Recently Deleted.`,
+      targetRecordId: teacherToDelete.id,
+      targetRecordName: `${teacherToDelete.user.firstName} ${teacherToDelete.user.lastName}`,
+    });
+
+    return res.status(200).json({ success: true, message: 'Teacher moved to Recently Deleted.' });
+  } catch (error) {
+    console.error('❌ Error deleting teacher:', error);
+    return res.status(500).json({ success: false, message: `Teacher deletion failed: ${error.message}` });
   }
 });
 

@@ -114,10 +114,20 @@ export default function AuditLogFilters({
         />
 
         <Box sx={{ display: 'flex', gap: 1, minWidth: { xs: '100%', md: 220 } }}>
-          <Button variant="contained" fullWidth onClick={onApply}>
+          <Button
+            variant="contained"
+            fullWidth
+            onClick={onApply}
+            sx={{ py: 1.5, bgcolor: '#2563eb', borderRadius: '10px', textTransform: 'none' }}
+          >
             Apply
           </Button>
-          <Button variant="outlined" fullWidth onClick={onReset}>
+          <Button
+            variant="outlined"
+            fullWidth
+            onClick={onReset}
+            sx={{ py: 1.5, borderRadius: '10px', textTransform: 'none' }}
+          >
             Reset
           </Button>
         </Box>

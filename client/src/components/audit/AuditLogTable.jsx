@@ -28,28 +28,23 @@ export default function AuditLogTable({
 }) {
   return (
     <Paper sx={{ borderRadius: '16px', overflow: 'hidden' }}>
-      <TableContainer>
+      <TableContainer sx={{ overflowX: 'auto' }}>
         <Table>
           <TableHead>
-            <TableRow sx={{ bgcolor: '#f8fafc' }}>
-              <TableCell>Date & Time</TableCell>
-              <TableCell>User</TableCell>
-              <TableCell>Role</TableCell>
-              <TableCell>Module</TableCell>
-              <TableCell>Action</TableCell>
-              <TableCell>Description</TableCell>
-              <TableCell>Target</TableCell>
-              <TableCell>IP Address</TableCell>
+            <TableRow sx={{ bgcolor: '#f1f5f9' }}>
+              {['Date & Time', 'User', 'Role', 'Module', 'Action', 'Description', 'Target', 'IP Address'].map((h) => (
+                <TableCell key={h} sx={{ fontWeight: 'bold', whiteSpace: 'nowrap' }}>
+                  {h}
+                </TableCell>
+              ))}
             </TableRow>
           </TableHead>
 
           <TableBody>
             {rows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} align="center">
-                  <Typography variant="body2" color="text.secondary" sx={{ py: 3 }}>
-                    No audit logs found for the selected filters.
-                  </Typography>
+                <TableCell colSpan={8} align="center" sx={{ py: 6, color: '#94a3b8' }}>
+                  No audit logs found for the selected filters.
                 </TableCell>
               </TableRow>
             ) : (
@@ -60,20 +55,24 @@ export default function AuditLogTable({
                   sx={{ cursor: 'pointer' }}
                   onClick={() => onRowClick(row)}
                 >
-                  <TableCell>{formatDate(row.createdAt)}</TableCell>
-                  <TableCell>{row.userName || 'System'}</TableCell>
-                  <TableCell>{row.userRole || '-'}</TableCell>
+                  <TableCell sx={{ whiteSpace: 'nowrap' }}>{formatDate(row.createdAt)}</TableCell>
+                  <TableCell sx={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{row.userName || 'System'}</TableCell>
+                  <TableCell sx={{ whiteSpace: 'nowrap' }}>{row.userRole || '-'}</TableCell>
                   <TableCell>
-                    <Chip size="small" label={row.module || '-'} />
+                    <Chip
+                      size="small"
+                      label={row.module || '-'}
+                      sx={{ bgcolor: '#eff6ff', color: '#2563eb', fontWeight: 700 }}
+                    />
                   </TableCell>
-                  <TableCell>{row.action}</TableCell>
+                  <TableCell sx={{ whiteSpace: 'nowrap' }}>{row.action}</TableCell>
                   <TableCell sx={{ maxWidth: 280 }}>
                     <Typography noWrap variant="body2">
                       {row.description}
                     </Typography>
                   </TableCell>
                   <TableCell>{row.targetRecordName || row.targetRecordId || '-'}</TableCell>
-                  <TableCell>{row.ipAddress || '-'}</TableCell>
+                  <TableCell sx={{ whiteSpace: 'nowrap' }}>{row.ipAddress || '-'}</TableCell>
                 </TableRow>
               ))
             )}
