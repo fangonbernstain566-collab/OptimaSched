@@ -56,7 +56,8 @@ export class ScheduleConflictService {
       semesterId,
       dayOfWeek,
       id: ignoreScheduleId ? { not: ignoreScheduleId } : undefined,
-      status: { notIn: ['ARCHIVED'] } // Only compare with active/draft paths
+      status: { notIn: ['ARCHIVED'] }, // Only compare with active/draft paths
+      isDeleted: false,
     };
 
     const concurrentSchedules = await prisma.schedule.findMany({
@@ -99,7 +100,8 @@ export class ScheduleConflictService {
         teacherId,
         schoolYearId,
         semesterId,
-        id: ignoreScheduleId ? { not: ignoreScheduleId } : undefined
+        id: ignoreScheduleId ? { not: ignoreScheduleId } : undefined,
+        isDeleted: false,
       },
       include: { subjectOffering: { include: { subject: true } } }
     });

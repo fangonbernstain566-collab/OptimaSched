@@ -12,6 +12,7 @@ import {
   Dashboard     as DashIcon,
   CalendarMonth as SchedIcon,
   GridView      as PlotterIcon,
+  RestoreFromTrash as TrashIcon,
   People        as TeacherIcon,
   MeetingRoom   as RoomIcon,
   Logout        as LogoutIcon,
@@ -53,6 +54,12 @@ const NAV_ITEMS = [
     text:  'Schedule Plotter',
     path:  '/schedules/plotter',
     icon:  <PlotterIcon fontSize="small" />,
+    roles: ['ADMINISTRATOR', 'REGISTRAR_SCHEDULER'],
+  },
+  {
+    text:  'Recently Deleted',
+    path:  '/schedules/recently-deleted',
+    icon:  <TrashIcon fontSize="small" />,
     roles: ['ADMINISTRATOR', 'REGISTRAR_SCHEDULER'],
   },
   {
@@ -306,7 +313,7 @@ export default function DashboardLayout() {
   // ─── Render ───────────────────────────────────────────────────────────────
   return (
     // ✅ FIX: was C.background (#F2F0EB beige) — pages need a white canvas
-    <Box sx={{ display: 'flex', bgcolor: C.card, minHeight: '100vh' }}>
+    <Box sx={{ display: 'flex', bgcolor: C.card, minHeight: '100vh', overflowX: 'hidden' }}>
 
       {/* ── AppBar ────────────────────────────────────────────────────────── */}
       <AppBar
@@ -416,6 +423,7 @@ export default function DashboardLayout() {
         sx={{
           flexGrow:  1,
           p:         3,
+          boxSizing: 'border-box',
           width:     { md: `calc(100% - ${DRAWER_WIDTH}px)` },
           minHeight: '100vh',
           // ✅ FIX: was C.background (beige) — explicit white for all page content

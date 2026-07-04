@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
 import {
   Box, Typography, Button, Paper, Table, TableBody, TableCell,
   TableHead, TableRow, Modal, TextField, MenuItem, Stack,
@@ -9,6 +10,7 @@ import {
   Add as AddIcon,
   Edit as EditIcon,
   Delete as DeleteIcon,
+  RestoreFromTrash as RestoreFromTrashIcon,
 } from '@mui/icons-material';
 import { useToast } from '../hooks/useToast';
 import Toast from '../components/Toast';
@@ -33,6 +35,7 @@ const INITIAL_FORM = {
 };
 
 const Schedules = () => {
+  const navigate = useNavigate();
   const [schedules, setSchedules]   = useState([]);
   const [options, setOptions]       = useState({
     teachers: [], rooms: [], sections: [],
@@ -225,7 +228,7 @@ const Schedules = () => {
     try {
       const config = getAuthHeaders();
       await axios.delete(`/api/schedules/${deleteId}`, config);
-      showToast('Schedule deleted successfully!', 'success');
+      showToast('Schedule moved to Recently Deleted.', 'success');
       setDeleteOpen(false);
       setDeleteId(null);
       fetchData();
@@ -371,7 +374,7 @@ const Schedules = () => {
 
   // ─── Render ───────────────────────────────────────────────────────────────
   return (
-    <Box sx={{ p: 4, minHeight: '100vh', bgcolor: '#f8fafc', mt: -4, mx: -4 }}>
+    <Box sx={{ p: 4, minHeight: '100vh', bgcolor: '#f8fafc', mt: -4 }}>
 
       <Toast toast={toast} onClose={hideToast} />
 
@@ -382,10 +385,20 @@ const Schedules = () => {
           <Typography variant="h4" fontWeight="800" sx={{ color: '#1e293b' }}>
             Manage Schedules
           </Typography>
-          <Button variant="contained" startIcon={<AddIcon />} onClick={openCreate}
-            sx={{ bgcolor: '#2563eb', borderRadius: '12px', textTransform: 'none' }}>
-            Add New Schedule
-          </Button>
+          <Box sx={{ display: 'flex', gap: 1.25 }}>
+            <Button
+              variant="outlined"
+              startIcon={<RestoreFromTrashIcon />}
+              onClick={() => navigate('/schedules/recently-deleted')}
+              sx={{ borderRadius: '12px', textTransform: 'none' }}
+            >
+              Recently Deleted
+            </Button>
+            <Button variant="contained" startIcon={<AddIcon />} onClick={openCreate}
+              sx={{ bgcolor: '#2563eb', borderRadius: '12px', textTransform: 'none' }}>
+              Add New Schedule
+            </Button>
+          </Box>
         </Box>
 
         {loading ? (
@@ -546,7 +559,7 @@ const Schedules = () => {
               Delete Schedule?
             </Typography>
             <Typography color="text.secondary" sx={{ mb: 3 }}>
-              This action cannot be undone. The schedule will be permanently removed.
+              This will move the schedule to Recently Deleted. You can restore it later.
             </Typography>
             <Divider sx={{ mb: 3 }} />
             <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center' }}>
@@ -557,7 +570,7 @@ const Schedules = () => {
               <Button variant="contained" onClick={confirmDelete}
                 sx={{ bgcolor: '#ef4444', borderRadius: '10px', textTransform: 'none', px: 3,
                   '&:hover': { bgcolor: '#dc2626' } }}>
-                Yes, Delete
+                Move to Recently Deleted
               </Button>
             </Box>
           </Box>

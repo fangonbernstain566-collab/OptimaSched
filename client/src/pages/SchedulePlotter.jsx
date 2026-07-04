@@ -286,7 +286,7 @@ const SchedulePlotter = () => {
   };
 
   return (
-    <Box sx={{ p: 4, minHeight: '100vh', bgcolor: '#f8fafc', mt: -4, mx: -4 }}>
+    <Box sx={{ p: 4, minHeight: '100vh', bgcolor: '#f8fafc', mt: -4 }}>
       <Toast toast={toast} onClose={hideToast} />
 
       <Box sx={{ maxWidth: '1500px', mx: 'auto' }}>

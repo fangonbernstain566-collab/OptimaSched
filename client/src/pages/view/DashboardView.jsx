@@ -50,7 +50,7 @@ const DashboardView = () => {
   }, []);
 
   return (
-    <Box sx={{ p: 4, minHeight: '100vh', bgcolor: '#f8fafc', mt: -4, mx: -4 }}>
+    <Box sx={{ p: 4, minHeight: '100vh', bgcolor: '#f8fafc', mt: -4 }}>
       <Box sx={{ maxWidth: '1200px', mx: 'auto' }}>
         <Box sx={{ mb: 4 }}>
           <Typography variant="h4" fontWeight="800" sx={{ color: '#1e293b', letterSpacing: '-1px' }}>Analytics Overview</Typography>

@@ -111,9 +111,13 @@ router.post('/', async (req, res) => {
       include: { user: true, department: true },
     });
 
-    // ✅ NEW: audit log for teacher registration
-    await logAudit(req, `${req.user.firstName} registered teacher ${newTeacher.user.firstName} ${newTeacher.user.lastName}`, {
-      entityType: 'Teacher', entityId: newTeacher.id,
+    await logAudit(req, {
+      action: 'TEACHER_CREATE',
+      module: 'TEACHER_MANAGEMENT',
+      description: `${req.user.firstName} registered teacher ${newTeacher.user.firstName} ${newTeacher.user.lastName}.`,
+      targetRecordId: newTeacher.id,
+      targetRecordName: `${newTeacher.user.firstName} ${newTeacher.user.lastName}`,
+      metadata: { email: newTeacher.user.email, department: newTeacher.department.name },
     });
 
     return res.status(201).json({

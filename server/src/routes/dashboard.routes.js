@@ -11,7 +11,7 @@ router.get('/metrics', async (req, res) => {
       prisma.teacher.count(),
       prisma.room.count(),
       prisma.section.count(),
-      prisma.schedule.count(),
+      prisma.schedule.count({ where: { isDeleted: false } }),
     ]);
 
     return res.status(200).json({

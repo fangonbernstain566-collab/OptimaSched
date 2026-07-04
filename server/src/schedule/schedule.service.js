@@ -6,10 +6,11 @@ const prisma = new PrismaClient();
 export class ScheduleService {
   /**
    * Fetches all schedules with optional filters for teachers, rooms, or sections.
-   */
+   */ 
   static async getAllSchedules(filters = {}) {
     return await prisma.schedule.findMany({
       where: {
+        ...(filters.includeDeleted ? {} : { isDeleted: false }),
         ...(filters.status && { status: filters.status }),
         ...(filters.teacherId && { teacherId: filters.teacherId }),
         ...(filters.roomId && { roomId: filters.roomId }),
@@ -47,7 +48,10 @@ export class ScheduleService {
         data: {
           action: 'Schedule Created',
           userId,
-          details: { scheduleId: schedule.id, payload: data }
+          module: 'SCHEDULE_MANAGEMENT',
+          description: 'Schedule created.',
+          targetRecordId: schedule.id,
+          metadata: { scheduleId: schedule.id, payload: data }
         }
       });
 
@@ -61,6 +65,7 @@ export class ScheduleService {
   static async updateSchedule(id, data, userId) {
     const existing = await prisma.schedule.findUnique({ where: { id } });
     if (!existing) throw new Error("Target schedule resource not found.");
+    if (existing.isDeleted) throw new Error("Cannot update a deleted schedule. Restore it first.");
     if (existing.status === 'PUBLISHED') throw new Error("Cannot modify an already published schedule.");
 
     // Validate modifications while ignoring this specific schedule record's current slot
@@ -79,7 +84,10 @@ export class ScheduleService {
         data: {
           action: 'Schedule Updated',
           userId,
-          details: { scheduleId: id, old: existing, new: updated }
+          module: 'SCHEDULE_MANAGEMENT',
+          description: 'Schedule updated.',
+          targetRecordId: id,
+          metadata: { scheduleId: id, old: existing, new: updated }
         }
       });
 
@@ -93,6 +101,7 @@ export class ScheduleService {
   static async transitionStatus(id, targetStatus, userId) {
     const existing = await prisma.schedule.findUnique({ where: { id } });
     if (!existing) throw new Error("Target schedule resource not found.");
+    if (existing.isDeleted) throw new Error("Cannot change status of a deleted schedule.");
 
     // Re-verify constraints if attempting to advance past draft status
     if (['FOR_REVIEW', 'APPROVED', 'PUBLISHED'].includes(targetStatus)) {
@@ -109,7 +118,10 @@ export class ScheduleService {
         data: {
           action: `Workflow Transitioned to ${targetStatus}`,
           userId,
-          details: { scheduleId: id, previousStatus: existing.status }
+          module: 'SCHEDULE_MANAGEMENT',
+          description: `Workflow transitioned to ${targetStatus}.`,
+          targetRecordId: id,
+          metadata: { scheduleId: id, previousStatus: existing.status }
         }
       });
 

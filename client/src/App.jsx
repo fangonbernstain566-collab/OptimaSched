@@ -9,6 +9,8 @@ import TeacherManager from './components/TeacherManager';
 import RoomManager from './components/RoomManager';
 import ManageSchedules from './pages/ManageSchedules';
 import SchedulePlotter from './pages/SchedulePlotter';
+import RecentlyDeletedSchedules from './pages/RecentlyDeletedSchedules';
+import AuditLogs from './pages/AuditLogs';
 
 export default function App() {
   return (
@@ -51,6 +53,15 @@ export default function App() {
         />
 
         <Route
+          path="schedules/recently-deleted"
+          element={
+            <ProtectedRoute allowedRoles={['ADMINISTRATOR', 'REGISTRAR_SCHEDULER']}>
+              <RecentlyDeletedSchedules />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
           path="teachers"
           element={
             <ProtectedRoute allowedRoles={['ADMINISTRATOR']}>
@@ -73,6 +84,15 @@ export default function App() {
           element={
             <ProtectedRoute allowedRoles={['ADMINISTRATOR', 'REGISTRAR_SCHEDULER']}>
               <ManageSchedules />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="audit-logs"
+          element={
+            <ProtectedRoute allowedRoles={['ADMINISTRATOR']}>
+              <AuditLogs />
             </ProtectedRoute>
           }
         />

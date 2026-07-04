@@ -109,12 +109,27 @@ model SchoolYear {
 }
 
 model AuditLog {
-  id        String   @id @default(uuid())
-  action    String
-  userId    String
-  details   Json
-  createdAt DateTime @default(now())
-  user      User     @relation(fields: [userId], references: [id])
+  id               String   @id @default(uuid())
+  userId           String?
+  userName         String?
+  userRole         String?
+  action           String
+  module           String
+  description      String
+  targetRecordId   String?
+  targetRecordName String?
+  ipAddress        String?
+  userAgent        String?
+  metadata         Json?
+  createdAt        DateTime @default(now())
+  user             User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([userId, createdAt])
+  @@index([module, createdAt])
+  @@index([action, createdAt])
+  @@index([userRole, createdAt])
+  @@index([targetRecordId])
 }
 
 model Semester {
@@ -138,6 +153,8 @@ model Schedule {
   endTime           String
   studentCount      Int             @default(0)
   status            ScheduleStatus  @default(PENDING)
+  isDeleted         Boolean         @default(false)
+  deletedAt         DateTime?
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
   room              Room            @relation(fields: [roomId], references: [id])

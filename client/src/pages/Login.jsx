@@ -11,11 +11,11 @@ import {
 } from '@mui/material';
 import {
   Visibility, VisibilityOff,
-  CalendarMonth as CalendarIcon,
   ChevronRight,
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
+import pcluLogo from '../upload/22.png';
 
 // ─── Design tokens (from Figma theme.css) ────────────────────────────────────
 const C = {
@@ -164,13 +164,19 @@ export default function Login() {
                 width: 40, height: 40, borderRadius: '4px',
                 bgcolor: C.accent,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
+                overflow: 'hidden',
               }}
             >
-              <image href="/logo.svg" width="20" height="20" />
+              <Box
+                component="img"
+                src={pcluLogo}
+                alt="PCLU OptimaSched logo"
+                sx={{ width: 24, height: 24, display: 'block', objectFit: 'contain' }}
+              />
             </Box>
             <Box>
               <Typography sx={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.7rem', fontWeight: 600, letterSpacing: '0.18em', textTransform: 'uppercase' }}>
-                PCLU
+                Polytechnic College of La Union
               </Typography>
               <Typography sx={{ color: '#fff', fontSize: '0.875rem', fontWeight: 600, lineHeight: 1.2 }}>
                 OptimaSched
@@ -238,8 +244,13 @@ export default function Login() {
       >
         {/* Mobile-only logo */}
         <Box sx={{ display: { xs: 'flex', lg: 'none' }, alignItems: 'center', gap: 1, mb: 5 }}>
-          <Box sx={{ width: 32, height: 32, borderRadius: '4px', bgcolor: C.primary, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <CalendarIcon sx={{ color: '#fff', fontSize: 16 }} />
+          <Box sx={{ width: 32, height: 32, borderRadius: '4px', bgcolor: C.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+            <Box
+              component="img"
+              src={pcluLogo}
+              alt="PCLU OptimaSched logo"
+              sx={{ width: 20, height: 20, display: 'block', objectFit: 'contain' }}
+            />
           </Box>
           <Box>
             <Typography sx={{ color: C.primary, fontSize: '0.625rem', fontWeight: 600, letterSpacing: '0.15em', textTransform: 'uppercase' }}>PCLU</Typography>

@@ -1,7 +1,10 @@
 import { Router } from 'express';
 import prisma from '../config/prisma.js';
+import { authenticate, authorize } from '../middleware/auth.js';
+import { logAudit } from '../utils/auditLog.js';
 
 const router = Router();
+router.use(authenticate, authorize('ADMINISTRATOR'));
 
 const VALID_ROOM_TYPES = [
   'LECTURE_ROOM',
@@ -116,6 +119,19 @@ router.post('/', async (req, res) => {
       },
     });
 
+    await logAudit(req, {
+      action: 'ROOM_CREATE',
+      module: 'ROOM_MANAGEMENT',
+      description: `Created room ${room.name}.`,
+      targetRecordId: room.id,
+      targetRecordName: room.name,
+      metadata: {
+        building: room.building?.name ?? null,
+        capacity: room.capacity,
+        type: room.type,
+      },
+    });
+
     return res.status(201).json({
       success: true,
       message: 'Room created successfully.',
@@ -204,6 +220,19 @@ router.put('/:id', async (req, res) => {
       },
     });
 
+    await logAudit(req, {
+      action: 'ROOM_UPDATE',
+      module: 'ROOM_MANAGEMENT',
+      description: `Updated room ${updatedRoom.name}.`,
+      targetRecordId: updatedRoom.id,
+      targetRecordName: updatedRoom.name,
+      metadata: {
+        building: updatedRoom.building?.name ?? null,
+        capacity: updatedRoom.capacity,
+        type: updatedRoom.type,
+      },
+    });
+
     return res.status(200).json({
       success: true,
       message: 'Room updated successfully.',
@@ -238,8 +267,31 @@ router.delete('/:id', async (req, res) => {
       });
     }
 
+    const roomToDelete = await prisma.room.findUnique({
+      where: { id },
+      include: { building: true },
+    });
+
+    if (!roomToDelete) {
+      return res.status(404).json({
+        success: false,
+        message: 'Room not found.',
+      });
+    }
+
     await prisma.room.delete({
       where: { id },
+    });
+
+    await logAudit(req, {
+      action: 'ROOM_DELETE',
+      module: 'ROOM_MANAGEMENT',
+      description: `Deleted room ${roomToDelete.name}.`,
+      targetRecordId: roomToDelete.id,
+      targetRecordName: roomToDelete.name,
+      metadata: {
+        building: roomToDelete.building?.name ?? null,
+      },
     });
 
     return res.status(200).json({
