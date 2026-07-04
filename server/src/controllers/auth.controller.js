@@ -77,7 +77,8 @@ export const loginUser = async (req, res, next) => {
       { expiresIn: '8h' }
     );
 
-    await logAudit({ ...req, user }, {
+    req.user = user;
+    await logAudit(req, {
       action: 'USER_LOGIN',
       module: 'AUTH',
       description: `User ${user.email} logged in successfully.`,
