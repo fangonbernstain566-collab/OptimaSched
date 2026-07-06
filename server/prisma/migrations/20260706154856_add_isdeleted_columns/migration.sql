@@ -1,0 +1,12 @@
+-- AlterTable
+ALTER TABLE "AuditLog" ALTER COLUMN "module" DROP DEFAULT,
+ALTER COLUMN "description" DROP DEFAULT;
+
+-- AlterTable
+ALTER TABLE "Room" ADD COLUMN     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ADD COLUMN     "deletedAt" TIMESTAMP(3),
+ADD COLUMN     "isDeleted" BOOLEAN NOT NULL DEFAULT false;
+
+-- AlterTable
+ALTER TABLE "Teacher" ADD COLUMN     "deletedAt" TIMESTAMP(3),
+ADD COLUMN     "isDeleted" BOOLEAN NOT NULL DEFAULT false;
