@@ -7,3 +7,13 @@ Instructor:
 
 hely.ten@pclu.edu.ph
 Password123!
+
+Registar:
+
+registrar@pclu.edu.ph
+Password123!
+
+Cashier:
+
+cashier@pclu.edu.ph
+Password123!
