@@ -191,6 +191,7 @@ model Schedule {
 enum RoleName {
   ADMINISTRATOR
   REGISTRAR_SCHEDULER
+  CASHIER
   INSTRUCTOR
   STUDENT
 }

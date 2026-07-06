@@ -11,7 +11,7 @@ async function main() {
 
   // ─── 1. Roles ──────────────────────────────────────────────────────────────
   console.log('Seeding roles...');
-  const roleNames = ['ADMINISTRATOR', 'REGISTRAR_SCHEDULER', 'INSTRUCTOR', 'STUDENT'];
+ const roleNames = ['ADMINISTRATOR', 'REGISTRAR_SCHEDULER', 'CASHIER', 'INSTRUCTOR', 'STUDENT'];
   for (const name of roleNames) {
     await prisma.role.upsert({
       where:  { name },
@@ -27,7 +27,7 @@ async function main() {
     throw new Error('Required roles were not created.');
   }
   console.log('✅ Roles created/updated');
-
+  
   // ─── 2. Admin User ─────────────────────────────────────────────────────────
   console.log('Seeding admin user...');
   await prisma.user.upsert({
@@ -42,6 +42,37 @@ async function main() {
     },
   });
   console.log('✅ Admin user created: admin@pclu.edu.ph');
+  // --- 2b. Registrar User ---
+  console.log('Seeding registrar user...');
+  const registrarRole = await prisma.role.findUnique({ where: { name: 'REGISTRAR_SCHEDULER' } });
+  await prisma.user.upsert({
+    where:  { email: 'registrar@pclu.edu.ph' },
+    update: {},
+    create: {
+      email:        'registrar@pclu.edu.ph',
+      firstName:    'Regina',
+      lastName:     'Registrar',
+      passwordHash,
+      role:         { connect: { id: registrarRole.id } },
+    },
+  });
+  console.log('✅ Registrar user created: registrar@pclu.edu.ph');
+
+  // --- 2c. Cashier User ---
+  console.log('Seeding cashier user...');
+  const cashierRole = await prisma.role.findUnique({ where: { name: 'CASHIER' } });
+  await prisma.user.upsert({
+    where:  { email: 'cashier@pclu.edu.ph' },
+    update: {},
+    create: {
+      email:        'cashier@pclu.edu.ph',
+      firstName:    'Carlo',
+      lastName:     'Cashier',
+      passwordHash,
+      role:         { connect: { id: cashierRole.id } },
+    },
+  });
+  console.log('✅ Cashier user created: cashier@pclu.edu.ph');
 
   // ─── 3. Instructor User ────────────────────────────────────────────────────
   console.log('Seeding instructor user...');
