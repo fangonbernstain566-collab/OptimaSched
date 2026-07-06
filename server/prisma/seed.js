@@ -135,39 +135,40 @@ async function main() {
   // ─── 8. BSIT Curriculum: Subjects + Offerings + Year-Level Mapping ─────────
   console.log('Seeding BSIT curriculum (Year 1-4)...');
   const BSIT_CURRICULUM = {
-    1: [
-      { code: 'IT101',    name: 'Introduction to Computing',        units: 3, isLabRequired: true  },
-      { code: 'IT102',    name: 'Computer Programming 1',           units: 3, isLabRequired: true  },
-      { code: 'GE101',    name: 'Purposive Communication',          units: 3, isLabRequired: false },
-      { code: 'GE102',    name: 'Understanding the Self',           units: 3, isLabRequired: false },
-      { code: 'PE101',    name: 'Physical Education 1',             units: 2, isLabRequired: false },
-      { code: 'NSTP101',  name: 'NSTP 1',                           units: 3, isLabRequired: false },
-      { code: 'GE103',    name: 'Mathematics in the Modern World',  units: 3, isLabRequired: false },
-    ],
-    2: [
-      { code: 'IT201',   name: 'Data Structures and Algorithms',   units: 3, isLabRequired: true  },
-      { code: 'IT202',   name: 'Computer Programming 2',           units: 3, isLabRequired: true  },
-      { code: 'IT203',   name: 'Object-Oriented Programming',      units: 3, isLabRequired: true  },
-      { code: 'IT204',   name: 'Networking 1',                     units: 3, isLabRequired: true  },
-      { code: 'PE102',   name: 'Physical Education 2',             units: 2, isLabRequired: false },
-      { code: 'NSTP102', name: 'NSTP 2',                           units: 3, isLabRequired: false },
-    ],
-    3: [
-      { code: 'IT14',  name: 'Database Management',                units: 3, isLabRequired: true  },
-      { code: 'IT301', name: 'Systems Analysis and Design',        units: 3, isLabRequired: false },
-      { code: 'IT302', name: 'Web Development',                    units: 3, isLabRequired: true  },
-      { code: 'IT303', name: 'Operating Systems',                  units: 3, isLabRequired: true  },
-      { code: 'IT304', name: 'Human Computer Interaction',         units: 3, isLabRequired: false },
-      { code: 'IT305', name: 'Information Assurance and Security', units: 3, isLabRequired: false },
-    ],
-    4: [
-      { code: 'IT401', name: 'Capstone Project 1',                 units: 3, isLabRequired: false },
-      { code: 'IT402', name: 'Capstone Project 2',                 units: 3, isLabRequired: false },
-      { code: 'IT403', name: 'Systems Integration and Architecture', units: 3, isLabRequired: false },
-      { code: 'IT404', name: 'IT Elective 1',                      units: 3, isLabRequired: false },
-      { code: 'IT405', name: 'Practicum / On-the-Job Training',    units: 6, isLabRequired: false },
-    ],
-  };
+    1: [ // First Year - BS in Information Technology
+      { code: 'IT1',      name: 'Introduction to Computing',            units: 3, isLabRequired: true  },
+      { code: 'IT2',      name: 'Computer Programming 1',                units: 3, isLabRequired: true  },
+      { code: 'GE1',      name: 'Understanding the Self',                units: 3, isLabRequired: false },
+      { code: 'GE2',      name: 'Readings in Philippine History',        units: 3, isLabRequired: false },
+    { code: 'GE3',      name: 'The Contemporary World',                units: 3, isLabRequired: false },
+    { code: 'GE4',      name: 'Mathematics in the Modern World',       units: 3, isLabRequired: false },
+    { code: 'GEC1',     name: "People and the Earth's Ecosystems",     units: 3, isLabRequired: false },
+    { code: 'PATHFit1', name: 'Movement Competency Program',           units: 2, isLabRequired: false },
+    { code: 'NSTP1',    name: 'Civic Welfare Training Service 1',      units: 3, isLabRequired: false },
+  ],
+  2: [ // Second Year - BS in Information Technology
+    { code: 'IT6',       name: 'Data Structures & Algorithm',          units: 3, isLabRequired: true  },
+    { code: 'IT4',       name: 'Application Dev. & Emerging Tech.',    units: 3, isLabRequired: true  },
+    { code: 'IT10',      name: 'Discrete Mathematics',                 units: 3, isLabRequired: false },
+    { code: 'GE8',       name: 'IT Professional Ethics',                units: 3, isLabRequired: false },
+    { code: 'GEC3',      name: 'World Literature',                     units: 3, isLabRequired: false },
+    { code: 'PATHFit3',  name: 'Fundamentals of Games and Sports',     units: 2, isLabRequired: false },
+    { code: 'TechWrit',  name: 'Technical Report Writing',             units: 3, isLabRequired: false },
+  ],
+  3: [ // Third Year - BS in Information Technology
+    { code: 'IT Elec 1', name: 'Object Oriented Programming',          units: 3, isLabRequired: true  },
+    { code: 'IT20',      name: 'Networking 2',                         units: 3, isLabRequired: true  },
+    { code: 'IT11',      name: 'Integrative Programing & Tech. 1',     units: 3, isLabRequired: true  },
+    { code: 'IT14',      name: 'Information Assurance & Security 1',   units: 3, isLabRequired: true  },
+    { code: 'IT13',      name: 'Web Development',                      units: 3, isLabRequired: true  },
+    { code: 'IT12',      name: 'Research Method',                      units: 3, isLabRequired: false },
+    { code: 'IT15',      name: 'IT Trips and Seminar',                 units: 1, isLabRequired: false },
+  ],
+  4: [ // Fourth Year - BS in Information Technology
+    { code: 'CAP2',      name: 'Capstone Project 2',                    units: 3, isLabRequired: false },
+    { code: 'IT Elec 4', name: 'Integrative Programming Technology 2', units: 3, isLabRequired: false },
+  ],
+};
 
   for (const [yearLevel, subjects] of Object.entries(BSIT_CURRICULUM)) {
     for (const subjectData of subjects) {
