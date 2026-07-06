@@ -18,9 +18,11 @@ const PORT = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json()); // Handles incoming JSON payloads cleanly
 
+let databaseReady = false;
+
 // Base health verification endpoint
 app.get('/api/health', (req, res) => {
-  res.status(200).json({ status: "healthy", system: "OptimaSched Engine" });
+  res.status(200).json({ status: 'healthy', system: 'OptimaSched Engine', database: databaseReady ? 'connected' : 'disconnected' });
 });
 
 // App API Routers
@@ -38,16 +40,16 @@ app.use(errorHandler);
 async function startServer() {
   try {
     await prisma.$queryRaw`SELECT 1`;
+    databaseReady = true;
     console.log('✅ Database connection verified.');
-
-    app.listen(PORT, () => {
-      console.log(`🚀 OptimaSched core service running smoothly on port ${PORT}`);
-    });
   } catch (error) {
-    console.error('❌ Failed to start server due to database connection error:');
-    console.error(error);
-    process.exit(1);
+    databaseReady = false;
+    console.warn('⚠️ Database connection unavailable. Starting server without database connectivity:', error.message);
   }
+
+  app.listen(PORT, () => {
+    console.log(`🚀 OptimaSched core service running smoothly on port ${PORT}`);
+  });
 }
 
 startServer();

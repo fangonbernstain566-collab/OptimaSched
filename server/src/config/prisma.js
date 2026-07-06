@@ -3,14 +3,10 @@ import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
 
-if (!process.env.DATABASE_URL) {
-  throw new Error(
-    'DATABASE_URL is missing. Check your .env file location and variable name.'
-  );
-}
+const databaseUrl = process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/optimasched';
 
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
+  connectionString: databaseUrl,
   max: 10,
   connectionTimeoutMillis: 5000,
   idleTimeoutMillis: 30000,
@@ -18,9 +14,10 @@ const pool = new Pool({
 
 const adapter = new PrismaPg(pool);
 
-export const prisma = new PrismaClient({
+const prisma = new PrismaClient({
   adapter,
-  log: ['query', 'info', 'warn', 'error'],
+  log: process.env.NODE_ENV === 'development' ? ['warn', 'error'] : ['error'],
 });
 
+export { prisma };
 export default prisma;
