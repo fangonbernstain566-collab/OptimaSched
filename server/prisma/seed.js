@@ -29,7 +29,6 @@ async function main() {
   console.log('✅ Roles created/updated');
 
   // ─── 2. Admin User ─────────────────────────────────────────────────────────
-  // ✅ FIX: Admin user was completely missing — needed to log in after reset!
   console.log('Seeding admin user...');
   await prisma.user.upsert({
     where:  { email: 'admin@pclu.edu.ph' },
@@ -60,7 +59,6 @@ async function main() {
   console.log(`✅ Instructor created: ${instructorUser.email}`);
 
   // ─── 4. College + Department ───────────────────────────────────────────────
-  // ✅ FIX: Missing — required for creating Teacher records
   console.log('Seeding college and departments...');
   const college = await prisma.college.upsert({
     where:  { code: 'CCS' },
@@ -140,35 +138,35 @@ async function main() {
       { code: 'IT2',      name: 'Computer Programming 1',                units: 3, isLabRequired: true  },
       { code: 'GE1',      name: 'Understanding the Self',                units: 3, isLabRequired: false },
       { code: 'GE2',      name: 'Readings in Philippine History',        units: 3, isLabRequired: false },
-    { code: 'GE3',      name: 'The Contemporary World',                units: 3, isLabRequired: false },
-    { code: 'GE4',      name: 'Mathematics in the Modern World',       units: 3, isLabRequired: false },
-    { code: 'GEC1',     name: "People and the Earth's Ecosystems",     units: 3, isLabRequired: false },
-    { code: 'PATHFit1', name: 'Movement Competency Program',           units: 2, isLabRequired: false },
-    { code: 'NSTP1',    name: 'Civic Welfare Training Service 1',      units: 3, isLabRequired: false },
-  ],
-  2: [ // Second Year - BS in Information Technology
-    { code: 'IT6',       name: 'Data Structures & Algorithm',          units: 3, isLabRequired: true  },
-    { code: 'IT4',       name: 'Application Dev. & Emerging Tech.',    units: 3, isLabRequired: true  },
-    { code: 'IT10',      name: 'Discrete Mathematics',                 units: 3, isLabRequired: false },
-    { code: 'GE8',       name: 'IT Professional Ethics',                units: 3, isLabRequired: false },
-    { code: 'GEC3',      name: 'World Literature',                     units: 3, isLabRequired: false },
-    { code: 'PATHFit3',  name: 'Fundamentals of Games and Sports',     units: 2, isLabRequired: false },
-    { code: 'TechWrit',  name: 'Technical Report Writing',             units: 3, isLabRequired: false },
-  ],
-  3: [ // Third Year - BS in Information Technology
-    { code: 'IT Elec 1', name: 'Object Oriented Programming',          units: 3, isLabRequired: true  },
-    { code: 'IT20',      name: 'Networking 2',                         units: 3, isLabRequired: true  },
-    { code: 'IT11',      name: 'Integrative Programing & Tech. 1',     units: 3, isLabRequired: true  },
-    { code: 'IT14',      name: 'Information Assurance & Security 1',   units: 3, isLabRequired: true  },
-    { code: 'IT13',      name: 'Web Development',                      units: 3, isLabRequired: true  },
-    { code: 'IT12',      name: 'Research Method',                      units: 3, isLabRequired: false },
-    { code: 'IT15',      name: 'IT Trips and Seminar',                 units: 1, isLabRequired: false },
-  ],
-  4: [ // Fourth Year - BS in Information Technology
-    { code: 'CAP2',      name: 'Capstone Project 2',                    units: 3, isLabRequired: false },
-    { code: 'IT Elec 4', name: 'Integrative Programming Technology 2', units: 3, isLabRequired: false },
-  ],
-};
+      { code: 'GE3',      name: 'The Contemporary World',                units: 3, isLabRequired: false },
+      { code: 'GE4',      name: 'Mathematics in the Modern World',       units: 3, isLabRequired: false },
+      { code: 'GEC1',     name: "People and the Earth's Ecosystems",     units: 3, isLabRequired: false },
+      { code: 'PATHFit1', name: 'Movement Competency Program',           units: 2, isLabRequired: false },
+      { code: 'NSTP1',    name: 'Civic Welfare Training Service 1',      units: 3, isLabRequired: false },
+    ],
+    2: [ // Second Year - BS in Information Technology
+      { code: 'IT6',       name: 'Data Structures & Algorithm',          units: 3, isLabRequired: true  },
+      { code: 'IT4',       name: 'Application Dev. & Emerging Tech.',    units: 3, isLabRequired: true  },
+      { code: 'IT10',      name: 'Discrete Mathematics',                 units: 3, isLabRequired: false },
+      { code: 'GE8',       name: 'IT Professional Ethics',                units: 3, isLabRequired: false },
+      { code: 'GEC3',      name: 'World Literature',                     units: 3, isLabRequired: false },
+      { code: 'PATHFit3',  name: 'Fundamentals of Games and Sports',     units: 2, isLabRequired: false },
+      { code: 'TechWrit',  name: 'Technical Report Writing',             units: 3, isLabRequired: false },
+    ],
+    3: [ // Third Year - BS in Information Technology
+      { code: 'IT Elec 1', name: 'Object Oriented Programming',          units: 3, isLabRequired: true  },
+      { code: 'IT20',      name: 'Networking 2',                         units: 3, isLabRequired: true  },
+      { code: 'IT11',      name: 'Integrative Programing & Tech. 1',     units: 3, isLabRequired: true  },
+      { code: 'IT14',      name: 'Information Assurance & Security 1',   units: 3, isLabRequired: true  },
+      { code: 'IT13',      name: 'Web Development',                      units: 3, isLabRequired: true  },
+      { code: 'IT12',      name: 'Research Method',                      units: 3, isLabRequired: false },
+      { code: 'IT15',      name: 'IT Trips and Seminar',                 units: 1, isLabRequired: false },
+    ],
+    4: [ // Fourth Year - BS in Information Technology
+      { code: 'CAP2',      name: 'Capstone Project 2',                    units: 3, isLabRequired: false },
+      { code: 'IT Elec 4', name: 'Integrative Programming Technology 2', units: 3, isLabRequired: false },
+    ],
+  };
 
   for (const [yearLevel, subjects] of Object.entries(BSIT_CURRICULUM)) {
     for (const subjectData of subjects) {
@@ -200,17 +198,38 @@ async function main() {
       });
     }
   }
-
-  // Retire the temporary dev bootstrap that mapped IT14 into every year level —
-  // it now has its real Year 3 mapping from the loop above.
-  const it14 = await prisma.subject.findUnique({ where: { code: 'IT14' } });
-  if (it14) {
-    await prisma.curriculumSubject.deleteMany({
-      where: { subjectId: it14.id, program: 'BSIT', yearLevel: { not: 3 } },
-    });
-  }
-
   console.log('✅ BSIT curriculum (Year 1-4) seeded');
+
+  // ─── 8b. Remove old/retired subjects no longer in the curriculum ─────────
+  console.log('Cleaning up retired subjects...');
+  const validCodes = Object.values(BSIT_CURRICULUM).flat().map((s) => s.code);
+
+  const staleSubjects = await prisma.subject.findMany({
+    where: { code: { notIn: validCodes } },
+  });
+
+  for (const stale of staleSubjects) {
+    // Remove dependents first to avoid FK constraint errors
+    await prisma.curriculumSubject.deleteMany({ where: { subjectId: stale.id } });
+
+    const staleOfferings = await prisma.subjectOffering.findMany({
+      where: { subjectId: stale.id },
+      select: { id: true },
+    });
+    const staleOfferingIds = staleOfferings.map((o) => o.id);
+
+    if (staleOfferingIds.length > 0) {
+      // Schedules reference SubjectOffering with onDelete: RESTRICT,
+      // so any schedule rows using these offerings must go first.
+      await prisma.schedule.deleteMany({
+        where: { subjectOfferingId: { in: staleOfferingIds } },
+      });
+    }
+
+    await prisma.subjectOffering.deleteMany({ where: { subjectId: stale.id } });
+    await prisma.subject.delete({ where: { id: stale.id } });
+  }
+  console.log(`✅ Removed ${staleSubjects.length} retired subject(s)`);
 
   // ─── 9. Building + Rooms ───────────────────────────────────────────────────
   console.log('Seeding building and rooms...');
@@ -253,7 +272,6 @@ async function main() {
   }
   console.log('✅ Sections created');
 
-  // ✅ FIX: These lines are now INSIDE main() where defaultPassword is in scope
   console.log('✨ Seeding completed successfully!');
   console.log(`🔑 Default password for all users: ${defaultPassword}`);
 }
