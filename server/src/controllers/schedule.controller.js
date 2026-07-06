@@ -32,17 +32,20 @@ export const getSchedules = async (req, res) => {
 // 2. GET DROPDOWN OPTIONS
 export const getScheduleOptions = async (req, res) => {
   try {
-    const [teachers, rooms, sections] = await Promise.all([
+    const [teachers, rooms, sections, subjectOfferings] = await Promise.all([
       prisma.teacher.findMany({
         include: { user: true }
       }),
       prisma.room.findMany(),
-      prisma.section.findMany()
+      prisma.section.findMany(),
+      prisma.subjectOffering.findMany({
+        include: { subject: true }
+      })
     ]);
 
     return res.status(200).json({
       success: true,
-      data: { teachers, rooms, sections }
+      data: { teachers, rooms, sections, subjectOfferings }
     });
   } catch (error) {
     console.error("Error retrieving schedule options:", error);

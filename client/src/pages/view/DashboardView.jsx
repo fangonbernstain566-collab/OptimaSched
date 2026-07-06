@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Box, Typography, Paper, Grid, Stack } from '@mui/material';
-import { 
-  SupervisorAccount as TeacherIcon, 
-  MeetingRoom as RoomIcon, 
-  Class as SectionIcon, 
-  CalendarMonth as SchedIcon 
+import { Box, Typography, Paper, Grid } from '@mui/material';
+import {
+  SupervisorAccount as TeacherIcon,
+  MeetingRoom as RoomIcon,
+  Class as SectionIcon,
+  CalendarMonth as SchedIcon
 } from '@mui/icons-material';
+import TimetableAllocationProgress from '../../components/TimetableAllocationProgress';
 
 const StatCard = ({ title, value, icon, badgeText, badgeColor }) => (
   <Paper 
@@ -63,12 +64,7 @@ const DashboardView = () => {
           <Grid item xs={12} sm={6} md={3}><StatCard title="Active Blocks" value={metrics.schedules} icon={<SchedIcon />} badgeText="Scheduled Slots" badgeColor="#ea580c" /></Grid>
         </Grid>
 
-        <Paper sx={{ mt: 4, p: 4, borderRadius: '20px', border: '1px solid #e2e8f0', minHeight: '260px', display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: 'background.paper' }}>
-          <Stack alignItems="center" spacing={1}>
-            <Typography variant="h6" fontWeight="700" sx={{ color: '#334155' }}>Timetable Allocation Status</Typography>
-            <Typography variant="body2" sx={{ color: '#94a3b8', textAlign: 'center' }}>Charts tracking metrics will systematically display right here.</Typography>
-          </Stack>
-        </Paper>
+        <TimetableAllocationProgress />
       </Box>
     </Box>
   );

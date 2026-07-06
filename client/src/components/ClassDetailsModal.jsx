@@ -44,9 +44,16 @@ const ClassDetailsModal = ({ schedule, onClose, onSaved, getAuthHeaders, options
       <Box sx={{ p: 4, bgcolor: 'background.paper', width: '100%', maxWidth: 480, borderRadius: '20px', maxHeight: '90vh', overflowY: 'auto' }}>
 
         <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-          <Typography variant="h6" fontWeight="800">
-            {schedule.subjectOffering?.subject?.name ?? 'Class'}
-          </Typography>
+          <Box>
+            <Typography variant="h6" fontWeight="800">
+              {schedule.subjectOffering?.subject?.name ?? 'Class'}
+            </Typography>
+            {schedule.subjectOffering?.subject?.code && (
+              <Typography variant="body2" color="text.secondary">
+                Class Code: {schedule.subjectOffering.subject.code}
+              </Typography>
+            )}
+          </Box>
           <IconButton size="small" onClick={onClose}><CloseIcon /></IconButton>
         </Box>
 

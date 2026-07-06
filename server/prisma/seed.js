@@ -132,24 +132,84 @@ async function main() {
   }
   console.log('✅ Semesters created');
 
-  // ─── 8. Subject + Offering ─────────────────────────────────────────────────
-  console.log('Seeding subject...');
-  const subject = await prisma.subject.upsert({
-    where:  { code: 'CS101' },
-    update: { name: 'Intro to Computing', units: 3, isLabRequired: false },
-    create: { code: 'CS101', name: 'Intro to Computing', units: 3, isLabRequired: false },
+  // ─── 8. BSIT Curriculum: Subjects + Offerings + Year-Level Mapping ─────────
+  console.log('Seeding BSIT curriculum (Year 1-4)...');
+  const BSIT_CURRICULUM = {
+    1: [
+      { code: 'IT101',    name: 'Introduction to Computing',        units: 3, isLabRequired: true  },
+      { code: 'IT102',    name: 'Computer Programming 1',           units: 3, isLabRequired: true  },
+      { code: 'GE101',    name: 'Purposive Communication',          units: 3, isLabRequired: false },
+      { code: 'GE102',    name: 'Understanding the Self',           units: 3, isLabRequired: false },
+      { code: 'PE101',    name: 'Physical Education 1',             units: 2, isLabRequired: false },
+      { code: 'NSTP101',  name: 'NSTP 1',                           units: 3, isLabRequired: false },
+      { code: 'GE103',    name: 'Mathematics in the Modern World',  units: 3, isLabRequired: false },
+    ],
+    2: [
+      { code: 'IT201',   name: 'Data Structures and Algorithms',   units: 3, isLabRequired: true  },
+      { code: 'IT202',   name: 'Computer Programming 2',           units: 3, isLabRequired: true  },
+      { code: 'IT203',   name: 'Object-Oriented Programming',      units: 3, isLabRequired: true  },
+      { code: 'IT204',   name: 'Networking 1',                     units: 3, isLabRequired: true  },
+      { code: 'PE102',   name: 'Physical Education 2',             units: 2, isLabRequired: false },
+      { code: 'NSTP102', name: 'NSTP 2',                           units: 3, isLabRequired: false },
+    ],
+    3: [
+      { code: 'IT14',  name: 'Database Management',                units: 3, isLabRequired: true  },
+      { code: 'IT301', name: 'Systems Analysis and Design',        units: 3, isLabRequired: false },
+      { code: 'IT302', name: 'Web Development',                    units: 3, isLabRequired: true  },
+      { code: 'IT303', name: 'Operating Systems',                  units: 3, isLabRequired: true  },
+      { code: 'IT304', name: 'Human Computer Interaction',         units: 3, isLabRequired: false },
+      { code: 'IT305', name: 'Information Assurance and Security', units: 3, isLabRequired: false },
+    ],
+    4: [
+      { code: 'IT401', name: 'Capstone Project 1',                 units: 3, isLabRequired: false },
+      { code: 'IT402', name: 'Capstone Project 2',                 units: 3, isLabRequired: false },
+      { code: 'IT403', name: 'Systems Integration and Architecture', units: 3, isLabRequired: false },
+      { code: 'IT404', name: 'IT Elective 1',                      units: 3, isLabRequired: false },
+      { code: 'IT405', name: 'Practicum / On-the-Job Training',    units: 6, isLabRequired: false },
+    ],
+  };
 
-    where:  { code: 'IT14' },
-    update: { name: 'Database Management', units: 3, isLabRequired: false },
-    create: { code: 'IT14', name: 'Database Management', units: 3, isLabRequired: false },
-  });
-  const offering = await prisma.subjectOffering.findFirst({
-    where: { subjectId: subject.id },
-  });
-  if (!offering) {
-    await prisma.subjectOffering.create({ data: { subjectId: subject.id } });
+  for (const [yearLevel, subjects] of Object.entries(BSIT_CURRICULUM)) {
+    for (const subjectData of subjects) {
+      const subject = await prisma.subject.upsert({
+        where:  { code: subjectData.code },
+        update: { name: subjectData.name, units: subjectData.units, isLabRequired: subjectData.isLabRequired },
+        create: subjectData,
+      });
+
+      const existingOffering = await prisma.subjectOffering.findFirst({
+        where: { subjectId: subject.id },
+      });
+      if (!existingOffering) {
+        await prisma.subjectOffering.create({
+          data: { subjectId: subject.id, classCode: `${subject.code}-A` },
+        });
+      }
+
+      await prisma.curriculumSubject.upsert({
+        where: {
+          program_yearLevel_subjectId: {
+            program: 'BSIT',
+            yearLevel: Number(yearLevel),
+            subjectId: subject.id,
+          },
+        },
+        update: {},
+        create: { program: 'BSIT', yearLevel: Number(yearLevel), subjectId: subject.id },
+      });
+    }
   }
-  console.log(`✅ Subject + Offering ready`);
+
+  // Retire the temporary dev bootstrap that mapped IT14 into every year level —
+  // it now has its real Year 3 mapping from the loop above.
+  const it14 = await prisma.subject.findUnique({ where: { code: 'IT14' } });
+  if (it14) {
+    await prisma.curriculumSubject.deleteMany({
+      where: { subjectId: it14.id, program: 'BSIT', yearLevel: { not: 3 } },
+    });
+  }
+
+  console.log('✅ BSIT curriculum (Year 1-4) seeded');
 
   // ─── 9. Building + Rooms ───────────────────────────────────────────────────
   console.log('Seeding building and rooms...');
@@ -173,6 +233,8 @@ async function main() {
   console.log('✅ Building and rooms created');
 
   // ─── 10. Sections ──────────────────────────────────────────────────────────
+  // Naming convention: "<PROGRAM>-<YEAR_LETTER><BLOCK_NUMBER>", e.g. "BSIT-A1"
+  // -> program BSIT, yearLevel 1 (A=1, B=2, C=3, D=4).
   console.log('Seeding sections...');
   for (const name of [
     'BSIT-A1', 'BSIT-A2', 'BSIT-A3', 'BSIT-A4',
@@ -180,10 +242,12 @@ async function main() {
     'BSIT-C1', 'BSIT-C2',
     'BSIT-D1', 'BSIT-D2',
   ]) {
+    const yearLetter = name.split('-')[1][0];
+    const yearLevel = yearLetter.charCodeAt(0) - 'A'.charCodeAt(0) + 1;
     await prisma.section.upsert({
       where:  { name },
-      update: {},
-      create: { name },
+      update: { program: 'BSIT', yearLevel },
+      create: { name, program: 'BSIT', yearLevel },
     });
   }
   console.log('✅ Sections created');

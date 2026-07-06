@@ -85,17 +85,19 @@ model Room {
 }
 
 model Subject {
-  id            String            @id @default(uuid())
-  code          String            @unique
-  name          String
-  units         Int
-  isLabRequired Boolean           @default(false)
-  offerings     SubjectOffering[]
+  id                 String              @id @default(uuid())
+  code               String              @unique
+  name               String
+  units              Int
+  isLabRequired      Boolean             @default(false)
+  offerings          SubjectOffering[]
+  curriculumSubjects CurriculumSubject[]
 }
 
 model SubjectOffering {
   id        String     @id @default(uuid())
   subjectId String
+  classCode String     @unique
   schedules Schedule[]
   subject   Subject    @relation(fields: [subjectId], references: [id], onDelete: Cascade)
 }
@@ -103,7 +105,22 @@ model SubjectOffering {
 model Section {
   id        String     @id @default(uuid())
   name      String     @unique
+  program   String
+  yearLevel Int
   schedules Schedule[]
+}
+
+// Maps which subjects belong to a given program + year level curriculum.
+// Kept separate from Subject because gen-ed subjects (e.g. NSTP, PE) are
+// shared across multiple programs/year levels, not exclusive to one.
+model CurriculumSubject {
+  id        String  @id @default(uuid())
+  program   String
+  yearLevel Int
+  subjectId String
+  subject   Subject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  @@unique([program, yearLevel, subjectId])
 }
 
 model SchoolYear {

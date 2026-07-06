@@ -43,6 +43,7 @@ const buildTooltip = (occupant) => {
         {occupant.subjectOffering?.subject?.name ?? 'Unknown Subject'}
       </Typography>
       <Stack spacing={0.4}>
+        <Typography variant="caption" display="block">🔖 Class Code: {occupant.subjectOffering?.classCode ?? '—'}</Typography>
         <Typography variant="caption" display="block">👤 {teacherName}</Typography>
         <Typography variant="caption" display="block">🏷 Section: {occupant.section?.name ?? '—'}</Typography>
         <Typography variant="caption" display="block">👥 Students: {occupant.studentCount ?? 0}</Typography>
@@ -496,21 +497,28 @@ const SchedulePlotter = () => {
               Confirm Placement
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-              The schedule will be marked as SCHEDULED.
+              {confirm && (
+                <>
+                  Placing <strong>{confirm.schedule.subjectOffering?.subject?.name ?? 'this class'}</strong>
+                  {' '}({confirm.schedule.subjectOffering?.classCode ?? '—'}) in <strong>{confirm.roomName}</strong> on{' '}
+                  <strong>{confirm.day}</strong> at <strong>{confirm.timeSlot}</strong>. It will be marked as SCHEDULED.
+                </>
+              )}
             </Typography>
 
             {confirm && (
               <Stack spacing={1.5} sx={{ mb: 3 }}>
                 {[
-                  ['📚 Subject',  confirm.schedule.subjectOffering?.subject?.name ?? '—'],
-                  ['👤 Teacher',  confirm.schedule.teacher?.user
+                  ['📚 Subject',     confirm.schedule.subjectOffering?.subject?.name ?? '—'],
+                  ['🔖 Class Code',  confirm.schedule.subjectOffering?.classCode ?? '—'],
+                  ['👤 Teacher',     confirm.schedule.teacher?.user
                       ? `${confirm.schedule.teacher.user.firstName} ${confirm.schedule.teacher.user.lastName}`
                       : '—'],
-                  ['🏫 Room',     `${confirm.roomName} (Cap: ${confirm.roomCapacity})`],
-                  ['👥 Students', confirm.schedule.studentCount ?? 0],
-                  ['📅 Day',      confirm.day],
-                  ['⏰ Time',     `${confirm.timeSlot} – ${confirm.endTime}`],
-                  ['🏷 Section',  confirm.schedule.section?.name ?? '—'],
+                  ['🏫 Room',        `${confirm.roomName} (Cap: ${confirm.roomCapacity})`],
+                  ['👥 Students',    confirm.schedule.studentCount ?? 0],
+                  ['📅 Day',         confirm.day],
+                  ['⏰ Time',        `${confirm.timeSlot} – ${confirm.endTime}`],
+                  ['🏷 Section',     confirm.schedule.section?.name ?? '—'],
                 ].map(([label, value]) => (
                   <Box key={label} sx={{
                     display: 'flex', justifyContent: 'space-between',

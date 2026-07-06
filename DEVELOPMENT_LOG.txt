@@ -1,0 +1,94 @@
+============================================================
+Date: 2026-07-06
+Feature: Curriculum-Based Subject/Class-Code Filtering + Timetable Allocation Progress Widget
+============================================================
+
+## Feature Summary
+Schedules can now only be built from subjects that actually belong to the selected section's curriculum, instead of picking from every subject offering in the system. This is powered by a new `CurriculumSubject` model mapping program + year level to subjects, and a new `classCode` field on `SubjectOffering` (e.g. "IT101-A") that identifies the specific class section a schedule slot belongs to. The dashboard's placeholder "Timetable Allocation Status" panel was replaced with a live widget showing real allocation progress for the active school year/semester.
+
+## Changes Made
+### Frontend
+- `Schedules.jsx`: Section select now cascades — choosing a Section fetches that section's curriculum subjects via `/api/subject-offerings/by-section/:sectionId`; Subject and Class Code are now two dependent dropdowns instead of one flat Subject Offering picker; added validation requiring Section, Subject, and Class Code before submit; table now shows a Class Code column.
+- `ScheduleManager.jsx`: added a Subject Offering dropdown plus a read-only Class Code display field; table shows Class Code column.
+- `SchedulePlotter.jsx`: tooltip and placement-confirmation dialog now display the class code alongside the subject.
+- `ClassDetailsModal.jsx`: shows the subject's code under the subject name.
+- `DashboardView.jsx`: swapped the static placeholder panel for the new `TimetableAllocationProgress` component.
+- Added `TimetableAllocationProgress.jsx`: self-contained widget with loading skeleton, error/retry state, a progress bar, and Allocated/Remaining/Completed-Blocks stat tiles, fed by `/api/dashboard/timetable-progress`.
+
+### Backend
+- Added `subjectOffering.routes.js` — `GET /api/subject-offerings/by-section/:sectionId` resolves a section's program + year level, looks up its `CurriculumSubject` mappings, and returns subjects grouped with their nested class codes.
+- `dashboard.routes.js` — added `GET /api/dashboard/timetable-progress`, computing allocation percentage from sections with at least one active schedule in the current school year + semester.
+- `schedule.controller.js` — `getScheduleOptions` now also returns `subjectOfferings` (with subject included) in dropdown data.
+- `app.js` — mounted the new subject-offering routes at `/api/subject-offerings`.
+
+### Database
+- `Section`: added `program` (String) and `yearLevel` (Int), backfilled from the existing `"<PROGRAM>-<YEAR_LETTER><BLOCK>"` naming convention.
+- `SubjectOffering`: added a required, unique `classCode` field; existing rows backfilled as `"<SubjectCode>-<Letter>"`.
+- Added `CurriculumSubject` model (program, yearLevel, subjectId) with a unique constraint on the triple, mapping which subjects belong to which program/year level.
+- Migration includes a dev-only bootstrap that maps every existing Subject to all 4 BSIT year levels so old seed data keeps working until real mappings are entered per subject.
+- `seed.js` rewritten to seed a full BSIT Year 1-4 curriculum (subjects, offerings with real class codes, and curriculum mappings) instead of a single hardcoded subject, and to set `program`/`yearLevel` on seeded sections.
+
+### API
+- New: `GET /api/subject-offerings/by-section/:sectionId`
+- New: `GET /api/dashboard/timetable-progress`
+- Changed: `GET /api/schedules/options` response now includes `subjectOfferings`
+
+### Validation
+- `Schedules.jsx` form now blocks submission unless Section, Subject, and Class Code are all selected.
+
+### Bug Fixes
+- None.
+
+## Technical Flow
+1. User opens the Schedules form and picks a Section.
+2. Frontend calls `GET /api/subject-offerings/by-section/:sectionId`; backend resolves the section's `program`/`yearLevel`, queries `CurriculumSubject` for matching subjects, then fetches their `SubjectOffering` rows and groups them by subject with nested class codes.
+3. User picks a Subject (from the filtered list), then a Class Code (from that subject's offerings) — selecting a Class Code sets `formData.subjectOfferingId`, the value actually submitted with the schedule.
+4. On the dashboard, `TimetableAllocationProgress` calls `GET /api/dashboard/timetable-progress` on mount, which counts total sections vs. sections with at least one non-deleted schedule in the current school year + semester, and renders a progress bar and stat tiles.
+
+## Files Created
+- client/src/components/TimetableAllocationProgress.jsx
+- server/src/routes/subjectOffering.routes.js
+- server/prisma/migrations/20260705133000_add_curriculum_filtering/migration.sql
+
+## Files Modified
+- client/src/components/ClassDetailsModal.jsx
+- client/src/components/ScheduleManager.jsx
+- client/src/pages/SchedulePlotter.jsx
+- client/src/pages/Schedules.jsx
+- client/src/pages/view/DashboardView.jsx
+- server/prisma/schema.prisma
+- server/prisma/seed.js
+- server/src/app.js
+- server/src/controllers/schedule.controller.js
+- server/src/routes/dashboard.routes.js
+
+## Database Changes
+- Added `Section.program` (String, NOT NULL)
+- Added `Section.yearLevel` (Int, NOT NULL)
+- Added `SubjectOffering.classCode` (String, NOT NULL, UNIQUE)
+- Added `CurriculumSubject` table (program, yearLevel, subjectId), unique on (program, yearLevel, subjectId)
+
+## API Endpoints
+- GET /api/subject-offerings/by-section/:sectionId
+- GET /api/dashboard/timetable-progress
+- GET /api/schedules/options (response shape changed — now includes subjectOfferings)
+
+## Testing Checklist
+- [ ] Selecting a Section in the Schedules form loads only that section's curriculum subjects
+- [ ] Selecting a Subject filters Class Code options to that subject's offerings
+- [ ] Submitting without a Section/Subject/Class Code shows the corresponding validation toast
+- [ ] Dashboard Timetable Allocation Progress widget loads real percentage and stat tiles
+- [ ] Retry button on the widget recovers from a failed fetch
+- [ ] `prisma migrate` runs cleanly against a database with existing Section/SubjectOffering rows
+- [ ] Seed script runs cleanly and produces BSIT Year 1-4 curriculum data
+
+## Notes
+- The migration's bootstrap step (mapping every Subject to all 4 BSIT year levels) is explicitly a dev convenience; `seed.js` immediately narrows IT14 back to its real Year 3 mapping. Real curriculum data for other programs still needs to be entered manually.
+
+============================================================
+Git Commit
+============================================================
+
+2026-07-06 - Add curriculum-based subject/class-code filtering to schedule creation and a live timetable allocation progress widget
+
+============================================================

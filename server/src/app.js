@@ -9,6 +9,7 @@ import dashboardRoutes from './routes/dashboard.routes.js';
 import teacherRoutes from './routes/teacher.routes.js'; 
 import roomRoutes from './routes/room.routes.js'; // Import the room routes
 import auditLogRoutes from './routes/auditLog.routes.js';
+import subjectOfferingRoutes from './routes/subjectOffering.routes.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -29,6 +30,7 @@ app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/teachers', teacherRoutes); // Cleanly structured mounting point
 app.use('/api/rooms', roomRoutes); // Mount the room route
 app.use('/api/audit-logs', auditLogRoutes);
+app.use('/api/subject-offerings', subjectOfferingRoutes);
 // Centralized error interceptor fallback hook (Must remain last)
 app.use(errorHandler);
 

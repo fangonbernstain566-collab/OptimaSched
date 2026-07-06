@@ -4,9 +4,9 @@ import axios from 'axios';
 export default function ScheduleManager() {
   // State management for data
   const [schedules, setSchedules] = useState([]);
-  const [options, setOptions] = useState({ teachers: [], rooms: [], sections: [] });
+  const [options, setOptions] = useState({ teachers: [], rooms: [], sections: [], subjectOfferings: [] });
   const [loading, setLoading] = useState(true);
-  
+
   // State management for the form modal
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
@@ -14,6 +14,7 @@ export default function ScheduleManager() {
     teacherId: '',
     roomId: '',
     sectionId: '',
+    subjectOfferingId: '',
     dayOfWeek: 'Monday',
     startTime: '',
     endTime: ''
@@ -49,6 +50,7 @@ export default function ScheduleManager() {
       teacherId: options.teachers[0]?.id || '',
       roomId: options.rooms[0]?.id || '',
       sectionId: options.sections[0]?.id || '',
+      subjectOfferingId: options.subjectOfferings[0]?.id || '',
       dayOfWeek: 'Monday',
       startTime: '08:00',
       endTime: '09:00'
@@ -63,6 +65,7 @@ export default function ScheduleManager() {
       teacherId: schedule.teacherId,
       roomId: schedule.roomId,
       sectionId: schedule.sectionId,
+      subjectOfferingId: schedule.subjectOfferingId,
       dayOfWeek: schedule.dayOfWeek,
       startTime: schedule.startTime,
       endTime: schedule.endTime
@@ -139,13 +142,14 @@ export default function ScheduleManager() {
             <th style={{ padding: '12px' }}>Instructor</th>
             <th style={{ padding: '12px' }}>Assigned Location</th>
             <th style={{ padding: '12px' }}>Course Section</th>
+            <th style={{ padding: '12px' }}>Class Code</th>
             <th style={{ padding: '12px' }}>Actions</th>
           </tr>
         </thead>
         <tbody>
           {schedules.length === 0 ? (
             <tr>
-              <td colSpan="6" style={{ padding: '20px', textAlign: 'center', color: '#666' }}>No entries found inside data layer constraints. Click button to seed workspace records.</td>
+              <td colSpan="7" style={{ padding: '20px', textAlign: 'center', color: '#666' }}>No entries found inside data layer constraints. Click button to seed workspace records.</td>
             </tr>
           ) : (
             schedules.map((item) => (
@@ -155,6 +159,7 @@ export default function ScheduleManager() {
                 <td style={{ padding: '12px' }}>{item.teacher?.user ? `${item.teacher.user.firstName} ${item.teacher.user.lastName}` : 'Unassigned'}</td>
                 <td style={{ padding: '12px' }}>{item.room?.name || 'N/A'}</td>
                 <td style={{ padding: '12px' }}>{item.section?.name || 'N/A'}</td>
+                <td style={{ padding: '12px' }}>{item.subjectOffering?.subject?.code || 'N/A'}</td>
                 <td style={{ padding: '12px' }}>
                   <button onClick={() => handleOpenEdit(item)} style={{ marginRight: '8px', padding: '6px 12px', background: '#f0f0f0', border: '1px solid #ccc', borderRadius: '4px', cursor: 'pointer' }}>Edit</button>
                   <button onClick={() => handleDelete(item.id)} style={{ padding: '6px 12px', background: '#ff4d4d', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Delete</button>
@@ -209,13 +214,33 @@ export default function ScheduleManager() {
               </select>
             </div>
 
-            <div style={{ marginBottom: '20px' }}>
+            <div style={{ marginBottom: '14px' }}>
               <label style={{ display: 'block', marginBottom: '4px' }}>Academic Section Target</label>
               <select name="sectionId" value={formData.sectionId} onChange={handleInputChange} style={{ width: '100%', padding: '8px' }}>
                 {options.sections.map(s => (
                   <option key={s.id} value={s.id}>{s.name}</option>
                 ))}
               </select>
+            </div>
+
+            <div style={{ marginBottom: '14px' }}>
+              <label style={{ display: 'block', marginBottom: '4px' }}>Subject Offering</label>
+              <select name="subjectOfferingId" value={formData.subjectOfferingId} onChange={handleInputChange} style={{ width: '100%', padding: '8px' }}>
+                {options.subjectOfferings.map(so => (
+                  <option key={so.id} value={so.id}>{so.subject?.code} - {so.subject?.name}</option>
+                ))}
+              </select>
+            </div>
+
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{ display: 'block', marginBottom: '4px' }}>Class Code</label>
+              <input
+                type="text"
+                value={options.subjectOfferings.find(so => so.id === formData.subjectOfferingId)?.subject?.code || ''}
+                readOnly
+                disabled
+                style={{ width: '100%', padding: '8px', background: '#f5f5f5', color: '#555' }}
+              />
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>

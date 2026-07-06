@@ -51,6 +51,11 @@ const Schedules = () => {
   const [roomConflict, setRoomConflict] = useState(null);
   const [detailTarget, setDetailTarget] = useState(null);
 
+  // Curriculum-filtered subjects for the currently selected section.
+  const [filteredSubjects, setFilteredSubjects] = useState([]);
+  const [subjectsLoading, setSubjectsLoading] = useState(false);
+  const [selectedSubjectId, setSelectedSubjectId] = useState('');
+
   const { toast, showToast, hideToast } = useToast();
 
   // ─── Auth Helper ──────────────────────────────────────────────────────────
@@ -111,19 +116,70 @@ const Schedules = () => {
     setRoomConflict(found ?? null);
   }, [formData.roomId, formData.dayOfWeek, formData.startTime, formData.endTime, schedules, editTarget]);
 
+  // Cascading fetch: whenever the selected section changes, load the subjects
+  // that belong to that section's program + year level curriculum.
+  useEffect(() => {
+    if (!formData.sectionId) {
+      setFilteredSubjects([]);
+      setSelectedSubjectId('');
+      return;
+    }
+
+    let cancelled = false;
+    setSubjectsLoading(true);
+
+    (async () => {
+      try {
+        const config = getAuthHeaders();
+        const res = await axios.get(`/api/subject-offerings/by-section/${formData.sectionId}`, config);
+        if (cancelled) return;
+        setFilteredSubjects(res.data?.data?.subjectOfferings ?? []);
+      } catch (err) {
+        if (!cancelled) {
+          setFilteredSubjects([]);
+          showToast(err.response?.data?.message ?? 'Failed to load subjects for this section.', 'error');
+        }
+      } finally {
+        if (!cancelled) setSubjectsLoading(false);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [formData.sectionId]);
+
   // ─── Form Helpers ─────────────────────────────────────────────────────────
   const handleChange = (field) => (e) =>
     setFormData((prev) => ({ ...prev, [field]: e.target.value }));
 
+  // Changing the Section clears the (now possibly invalid) Subject Offering
+  // and Class Code selections so stale picks can't slip through to Save.
+  const handleSectionChange = (e) => {
+    const sectionId = e.target.value;
+    setSelectedSubjectId('');
+    setFormData((prev) => ({ ...prev, sectionId, subjectOfferingId: '' }));
+  };
+
+  // Picking a Subject resets Class Code — its offerings load instantly from
+  // the already-fetched `filteredSubjects` data, no extra request needed.
+  const handleSubjectChange = (e) => {
+    setSelectedSubjectId(e.target.value);
+    setFormData((prev) => ({ ...prev, subjectOfferingId: '' }));
+  };
+
+  const selectedSubject = filteredSubjects.find((s) => s.id === selectedSubjectId) ?? null;
+
   const openCreate = () => {
     setEditTarget(null);
     setFormData(INITIAL_FORM);
+    setFilteredSubjects([]);
+    setSelectedSubjectId('');
     setRoomConflict(null);
     setOpen(true);
   };
 
   const openEdit = (schedule) => {
     setEditTarget(schedule);
+    setSelectedSubjectId(schedule.subjectOffering?.subjectId ?? '');
     setFormData({
       teacherId:         schedule.teacherId,
       roomId:            schedule.roomId,
@@ -144,11 +200,26 @@ const Schedules = () => {
     setOpen(false);
     setEditTarget(null);
     setFormData(INITIAL_FORM);
+    setFilteredSubjects([]);
+    setSelectedSubjectId('');
     setRoomConflict(null);
   };
 
   // ─── Validate Form ────────────────────────────────────────────────────────
   const validateForm = () => {
+    if (!formData.sectionId) {
+      showToast('Please select a Section.', 'warning');
+      return false;
+    }
+    if (!selectedSubjectId) {
+      showToast('Please select a Subject Offering.', 'warning');
+      return false;
+    }
+    if (!formData.subjectOfferingId) {
+      showToast('Please select a Class Code.', 'warning');
+      return false;
+    }
+
     const required = [
       'teacherId', 'roomId', 'sectionId', 'subjectOfferingId',
       'schoolYearId', 'semesterId', 'dayOfWeek', 'startTime', 'endTime',
@@ -272,7 +343,7 @@ const Schedules = () => {
           </TextField>
 
           <TextField select fullWidth required label="Section"
-            value={formData.sectionId} onChange={handleChange('sectionId')}>
+            value={formData.sectionId} onChange={handleSectionChange}>
             {options.sections.length > 0
               ? options.sections.map((s) => (
                   <MenuItem key={s.id} value={s.id}>{s.name}</MenuItem>
@@ -281,17 +352,39 @@ const Schedules = () => {
           </TextField>
         </Box>
 
-        {/* Subject Offering */}
-        <TextField select fullWidth required label="Subject Offering"
-          value={formData.subjectOfferingId} onChange={handleChange('subjectOfferingId')}>
-          {options.subjectOfferings.length > 0
-            ? options.subjectOfferings.map((so) => (
-                <MenuItem key={so.id} value={so.id}>
-                  {so.subject?.name ?? `Offering #${so.id}`}
-                </MenuItem>
-              ))
-            : <MenuItem disabled>No Subject Offerings Available</MenuItem>}
-        </TextField>
+        {/* Subject Offering — filtered to the selected section's program + year level */}
+        <Box sx={{ display: 'flex', gap: 2 }}>
+          <TextField select fullWidth required label="Subject Offering"
+            value={selectedSubjectId} onChange={handleSubjectChange}
+            disabled={!formData.sectionId || subjectsLoading}
+            helperText={
+              !formData.sectionId ? 'Select a section first'
+                : subjectsLoading ? 'Loading subjects...'
+                : filteredSubjects.length === 0 ? 'No subject offerings found.'
+                : ' '
+            }
+          >
+            {subjectsLoading
+              ? <MenuItem disabled>Loading subjects...</MenuItem>
+              : filteredSubjects.length > 0
+                ? filteredSubjects.map((s) => (
+                    <MenuItem key={s.id} value={s.id}>{s.subjectCode} - {s.subjectName}</MenuItem>
+                  ))
+                : <MenuItem disabled>No subject offerings found.</MenuItem>}
+          </TextField>
+
+          <TextField select fullWidth required label="Class Code"
+            value={formData.subjectOfferingId} onChange={handleChange('subjectOfferingId')}
+            disabled={!selectedSubject}
+            helperText={!selectedSubject ? 'Select a subject first' : ' '}
+          >
+            {selectedSubject && selectedSubject.classCodes.length > 0
+              ? selectedSubject.classCodes.map((cc) => (
+                  <MenuItem key={cc.id} value={cc.id}>{cc.code}</MenuItem>
+                ))
+              : <MenuItem disabled>No class codes available</MenuItem>}
+          </TextField>
+        </Box>
 
         {/* School Year + Semester */}
         <Box sx={{ display: 'flex', gap: 2 }}>
@@ -457,7 +550,7 @@ const Schedules = () => {
               <Table>
                 <TableHead>
                   <TableRow sx={{ bgcolor: '#f1f5f9' }}>
-                    {['Subject', 'Teacher', 'Room', 'Section', 'Students', 'Day', 'Time', 'School Year', 'Semester', 'Status', 'Actions'].map((h) => (
+                    {['Class Code', 'Subject', 'Teacher', 'Room', 'Section', 'Students', 'Day', 'Time', 'School Year', 'Semester', 'Status', 'Actions'].map((h) => (
                       <TableCell key={h} sx={{ fontWeight: 'bold', whiteSpace: 'nowrap' }}>{h}</TableCell>
                     ))}
                   </TableRow>
@@ -465,7 +558,7 @@ const Schedules = () => {
                 <TableBody>
                   {schedules.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={11} align="center" sx={{ py: 6, color: '#94a3b8' }}>
+                      <TableCell colSpan={12} align="center" sx={{ py: 6, color: '#94a3b8' }}>
                         No schedules yet. Click "Add New Schedule" to get started.
                       </TableCell>
                     </TableRow>
@@ -477,6 +570,9 @@ const Schedules = () => {
                         onClick={() => setDetailTarget(s)}
                         sx={{ cursor: 'pointer' }}
                       >
+                        <TableCell sx={{ fontWeight: '600' }}>
+                          {s.subjectOffering?.subject?.code ?? '—'}
+                        </TableCell>
                         <TableCell sx={{ fontWeight: '600' }}>
                           {s.subjectOffering?.subject?.name ?? '—'}
                         </TableCell>
