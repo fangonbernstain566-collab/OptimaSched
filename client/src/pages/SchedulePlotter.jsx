@@ -19,16 +19,60 @@ import { useToast } from '../hooks/useToast';
 import Toast from '../components/Toast';
 
 const DAYS       = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
-const TIME_SLOTS = ['07:30', '09:00', '10:30', '12:00', '13:30', '15:00', '16:30'];
+const SLOT_MINUTES = 30;
+const GRID_START = '07:30';
+const GRID_END   = '18:00';
+
+const toMinutes = (time) => {
+  const [h, m] = time.split(':').map(Number);
+  return h * 60 + m;
+};
 
 const addMinutes = (time, mins) => {
-  const [h, m] = time.split(':').map(Number);
-  const total  = h * 60 + m + mins;
+  const total = toMinutes(time) + mins;
   return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
 };
 
-const getOccupant = (slots, roomId, day, timeSlot) =>
-  slots.find((s) => s.roomId === roomId && s.dayOfWeek === day && s.startTime === timeSlot);
+// Displays a "HH:mm" 24-hour string as standard 12-hour time, e.g. "13:30" -> "1:30 PM"
+const formatTime = (time) => {
+  if (!time) return time;
+  const [h, m] = time.split(':').map(Number);
+  const period = h >= 12 ? 'PM' : 'AM';
+  const hour12 = h % 12 === 0 ? 12 : h % 12;
+  return `${hour12}:${String(m).padStart(2, '0')} ${period}`;
+};
+
+const buildTimeSlots = (start, end, step) => {
+  const slots = [];
+  for (let t = toMinutes(start); t < toMinutes(end); t += step) {
+    slots.push(`${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`);
+  }
+  return slots;
+};
+
+const TIME_SLOTS = buildTimeSlots(GRID_START, GRID_END, SLOT_MINUTES);
+
+// Duration of a schedule in whole 30-minute slots (minimum 1).
+const durationInSlots = (schedule) => {
+  const mins = toMinutes(schedule.endTime) - toMinutes(schedule.startTime);
+  return Math.max(1, Math.round(mins / SLOT_MINUTES));
+};
+
+// Builds, per room, the list of occupants that start within the visible grid,
+// annotated with their starting slot index and how many slots they span —
+// so a 90-minute class renders as one merged block instead of 3 separate cells.
+const getRoomOccupancy = (slots, roomId, day) => {
+  const bySlotIndex = new Map();
+  slots
+    .filter((s) => s.roomId === roomId && s.dayOfWeek === day)
+    .forEach((occupant) => {
+      const startIdx = TIME_SLOTS.indexOf(occupant.startTime);
+      if (startIdx === -1) return;
+      const span = Math.min(durationInSlots(occupant), TIME_SLOTS.length - startIdx);
+      bySlotIndex.set(startIdx, { occupant, span });
+    });
+  return bySlotIndex;
+};
 
 const buildTooltip = (occupant) => {
   if (!occupant) return '';
@@ -47,7 +91,7 @@ const buildTooltip = (occupant) => {
         <Typography variant="caption" display="block">👤 {teacherName}</Typography>
         <Typography variant="caption" display="block">🏷 Section: {occupant.section?.name ?? '—'}</Typography>
         <Typography variant="caption" display="block">👥 Students: {occupant.studentCount ?? 0}</Typography>
-        <Typography variant="caption" display="block">⏰ {occupant.startTime} – {occupant.endTime}</Typography>
+        <Typography variant="caption" display="block">⏰ {formatTime(occupant.startTime)} – {formatTime(occupant.endTime)}</Typography>
         <Typography variant="caption" display="block">
           📅 {occupant.schoolYear?.name ?? '—'} · {occupant.semester?.name ?? '—'}
         </Typography>
@@ -106,7 +150,7 @@ const PendingCard = ({ schedule }) => {
   );
 };
 
-const PlotterCell = ({ id, roomId, timeSlot, day, room, isOccupied, occupant, draggingCount }) => {
+const PlotterCell = ({ id, roomId, timeSlot, day, room, isOccupied, occupant, span = 1, gridColumn, gridRow, draggingCount }) => {
   const { setNodeRef, isOver } = useDroppable({
     id,
     data: { roomId, timeSlot, day, room },
@@ -135,7 +179,8 @@ const PlotterCell = ({ id, roomId, timeSlot, day, room, isOccupied, occupant, dr
     <Box
       ref={setNodeRef}
       sx={{
-        minHeight: 72, borderRadius: '8px',
+        gridColumn, gridRow,
+        minHeight: 56, borderRadius: '8px',
         border: '2px dashed', borderColor,
         bgcolor: bg, display: 'flex',
         alignItems: 'center', justifyContent: 'center',
@@ -148,6 +193,11 @@ const PlotterCell = ({ id, roomId, timeSlot, day, room, isOccupied, occupant, dr
           <Typography variant="caption" fontWeight="700" color="error.main" display="block" noWrap>
             {occupant?.subjectOffering?.subject?.name ?? 'Occupied'}
           </Typography>
+          {span > 1 && (
+            <Typography variant="caption" color="error.main" display="block" sx={{ opacity: 0.75, fontSize: '0.65rem' }} noWrap>
+              {formatTime(occupant?.startTime)} – {formatTime(occupant?.endTime)}
+            </Typography>
+          )}
         </Box>
       ) : isOver ? (
         <Typography variant="caption" fontWeight="700"
@@ -246,13 +296,15 @@ const SchedulePlotter = () => {
       return;
     }
 
+    const durationMins = toMinutes(schedule.endTime) - toMinutes(schedule.startTime);
+
     setConfirm({
       schedule,
       roomId,
       roomName: room.name,
       roomCapacity: room.capacity,
       timeSlot,
-      endTime: addMinutes(timeSlot, 90),
+      endTime: addMinutes(timeSlot, durationMins > 0 ? durationMins : 90),
       day,
     });
   };
@@ -398,65 +450,87 @@ const SchedulePlotter = () => {
                   ) : (
                     <Box sx={{
                       display: 'grid',
-                      gridTemplateColumns: `160px repeat(${TIME_SLOTS.length}, 1fr)`,
+                      gridTemplateColumns: `160px repeat(${TIME_SLOTS.length}, minmax(70px, 1fr))`,
                       gap: 1,
-                      minWidth: 900,
+                      minWidth: 160 + TIME_SLOTS.length * 80,
                     }}>
 
                       <Box />
                       {TIME_SLOTS.map((t) => (
                         <Box key={t} sx={{ textAlign: 'center', pb: 0.5 }}>
                           <Typography variant="caption" fontWeight="700" color="#475569">
-                            {t}
+                            {formatTime(t)}
                           </Typography>
                         </Box>
                       ))}
 
-                      {rooms.map((room) => (
-                        <React.Fragment key={room.id}>
+                      {rooms.map((room, roomIndex) => {
+                        const occupancyByStart = getRoomOccupancy(scheduled, room.id, selectedDay);
+                        const gridRow = roomIndex + 2; // row 1 is the time-slot header
 
-                          <Box sx={{
-                            display: 'flex', flexDirection: 'column',
-                            justifyContent: 'center', pr: 1.5,
-                            borderRight: '2px solid #e2e8f0',
-                          }}>
-                            <Typography variant="body2" fontWeight="700" noWrap>
-                              {room.name}
-                            </Typography>
-                            <Typography variant="caption" color="text.secondary">
-                              Cap: {room.capacity}
-                            </Typography>
-                            <Chip
-                              label={room.type?.replace(/_/g, ' ') ?? 'Room'}
-                              size="small"
-                              sx={{ fontSize: '0.6rem', height: 16, mt: 0.5, maxWidth: 140 }}
-                            />
-                            {activeSched && room.capacity < (activeSched.studentCount ?? 0) && (
-                              <Typography variant="caption" color="warning.main" fontWeight="700" sx={{ mt: 0.25 }}>
-                                ⚠ Too small
+                        // Slot indices already covered by an earlier, spanning block
+                        // must be skipped entirely — not rendered empty — otherwise
+                        // the grid's auto row-placement would shift later rooms.
+                        const coveredIndices = new Set();
+                        occupancyByStart.forEach(({ span }, startIdx) => {
+                          for (let i = 1; i < span; i += 1) coveredIndices.add(startIdx + i);
+                        });
+
+                        return (
+                          <React.Fragment key={room.id}>
+
+                            <Box sx={{
+                              gridColumn: 1, gridRow,
+                              display: 'flex', flexDirection: 'column',
+                              justifyContent: 'center', pr: 1.5,
+                              borderRight: '2px solid #e2e8f0',
+                            }}>
+                              <Typography variant="body2" fontWeight="700" noWrap>
+                                {room.name}
                               </Typography>
-                            )}
-                          </Box>
-
-                          {TIME_SLOTS.map((timeSlot) => {
-                            const occupant = getOccupant(scheduled, room.id, selectedDay, timeSlot);
-                            return (
-                              <PlotterCell
-                                key={`${room.id}||${timeSlot}`}
-                                id={`${room.id}||${timeSlot}||${selectedDay}`}
-                                roomId={room.id}
-                                timeSlot={timeSlot}
-                                day={selectedDay}
-                                room={room}
-                                isOccupied={!!occupant}
-                                occupant={occupant}
-                                draggingCount={activeSched?.studentCount ?? null}
+                              <Typography variant="caption" color="text.secondary">
+                                Cap: {room.capacity}
+                              </Typography>
+                              <Chip
+                                label={room.type?.replace(/_/g, ' ') ?? 'Room'}
+                                size="small"
+                                sx={{ fontSize: '0.6rem', height: 16, mt: 0.5, maxWidth: 140 }}
                               />
-                            );
-                          })}
+                              {activeSched && room.capacity < (activeSched.studentCount ?? 0) && (
+                                <Typography variant="caption" color="warning.main" fontWeight="700" sx={{ mt: 0.25 }}>
+                                  ⚠ Too small
+                                </Typography>
+                              )}
+                            </Box>
 
-                        </React.Fragment>
-                      ))}
+                            {TIME_SLOTS.map((timeSlot, slotIndex) => {
+                              if (coveredIndices.has(slotIndex)) return null;
+
+                              const occupied = occupancyByStart.get(slotIndex);
+                              const colStart = slotIndex + 2; // column 1 is the room label
+                              const span = occupied?.span ?? 1;
+
+                              return (
+                                <PlotterCell
+                                  key={`${room.id}||${timeSlot}`}
+                                  id={`${room.id}||${timeSlot}||${selectedDay}`}
+                                  roomId={room.id}
+                                  timeSlot={timeSlot}
+                                  day={selectedDay}
+                                  room={room}
+                                  isOccupied={!!occupied}
+                                  occupant={occupied?.occupant}
+                                  span={span}
+                                  gridColumn={`${colStart} / span ${span}`}
+                                  gridRow={gridRow}
+                                  draggingCount={activeSched?.studentCount ?? null}
+                                />
+                              );
+                            })}
+
+                          </React.Fragment>
+                        );
+                      })}
 
                     </Box>
                   )}
@@ -501,7 +575,7 @@ const SchedulePlotter = () => {
                 <>
                   Placing <strong>{confirm.schedule.subjectOffering?.subject?.name ?? 'this class'}</strong>
                   {' '}({confirm.schedule.subjectOffering?.classCode ?? '—'}) in <strong>{confirm.roomName}</strong> on{' '}
-                  <strong>{confirm.day}</strong> at <strong>{confirm.timeSlot}</strong>. It will be marked as SCHEDULED.
+                  <strong>{confirm.day}</strong> at <strong>{formatTime(confirm.timeSlot)}</strong>. It will be marked as SCHEDULED.
                 </>
               )}
             </Typography>
@@ -517,7 +591,7 @@ const SchedulePlotter = () => {
                   ['🏫 Room',        `${confirm.roomName} (Cap: ${confirm.roomCapacity})`],
                   ['👥 Students',    confirm.schedule.studentCount ?? 0],
                   ['📅 Day',         confirm.day],
-                  ['⏰ Time',        `${confirm.timeSlot} – ${confirm.endTime}`],
+                  ['⏰ Time',        `${formatTime(confirm.timeSlot)} – ${formatTime(confirm.endTime)}`],
                   ['🏷 Section',     confirm.schedule.section?.name ?? '—'],
                 ].map(([label, value]) => (
                   <Box key={label} sx={{
