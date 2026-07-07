@@ -262,26 +262,110 @@ async function main() {
   }
   console.log(`✅ Removed ${staleSubjects.length} retired subject(s)`);
 
-  // ─── 9. Building + Rooms ───────────────────────────────────────────────────
-  console.log('Seeding building and rooms...');
-  const building = await prisma.building.upsert({
-    where:  { name: 'Main Building' },
+  // ───// --- 9. Buildings + Rooms ---
+  console.log('Seeding buildings and rooms...');
+
+  const mainBuilding = await prisma.building.upsert({
+    where:  { name: 'College Main Building' },
     update: {},
-    create: { name: 'Main Building' },
+    create: { name: 'College Main Building' },
   });
-  for (const room of [
-    { name: 'Room 101',       capacity: 40, type: 'LECTURE_ROOM'        },
-    { name: 'Computer Lab 1', capacity: 35, type: 'COMPUTER_LABORATORY' },
-    { name: 'Science Lab 1',  capacity: 30, type: 'LABORATORY'          },
-  ]) {
+
+  const newBuilding = await prisma.building.upsert({
+    where:  { name: 'New Building' },
+    update: {},
+    create: { name: 'New Building' },
+  });
+
+  const allRooms = [
+    // --- Main Building 1st Floor ---
+    { name: 'Clinic',                              capacity: 10, type: 'CLINIC',              buildingId: mainBuilding.id },
+    { name: 'Computer Lab 1',                      capacity: 35, type: 'COMPUTER_LABORATORY', buildingId: mainBuilding.id },
+    { name: 'Computer Lab 2',                      capacity: 35, type: 'COMPUTER_LABORATORY', buildingId: mainBuilding.id },
+    { name: 'Computer Lab 3',                      capacity: 35, type: 'COMPUTER_LABORATORY', buildingId: mainBuilding.id },
+    { name: 'IT Faculty Room / Office of the Dean',capacity: 20, type: 'OFFICE',              buildingId: mainBuilding.id },
+    { name: 'Graduate School Room',                capacity: 30, type: 'LECTURE_ROOM',        buildingId: mainBuilding.id },
+    { name: "Registrar's Office",                  capacity: 10, type: 'OFFICE',              buildingId: mainBuilding.id },
+    { name: 'Office of the VP of Human Resources', capacity: 10, type: 'OFFICE',              buildingId: mainBuilding.id },
+    { name: 'Office of the VP of Academic Affairs',capacity: 10, type: 'OFFICE',              buildingId: mainBuilding.id },
+    { name: 'Accreditation / Defense Room',        capacity: 20, type: 'LECTURE_ROOM',        buildingId: mainBuilding.id },
+    { name: 'QA Manager Office',                   capacity: 10, type: 'OFFICE',              buildingId: mainBuilding.id },
+
+    // --- Main Building 2nd Floor ---
+    { name: 'College Library',                     capacity: 50, type: 'LIBRARY',             buildingId: mainBuilding.id },
+    { name: 'Graduate School Library / Research Center', capacity: 30, type: 'LIBRARY',       buildingId: mainBuilding.id },
+    { name: 'Room 201',                            capacity: 40, type: 'LECTURE_ROOM',        buildingId: mainBuilding.id },
+    { name: 'Room 202',                            capacity: 40, type: 'LECTURE_ROOM',        buildingId: mainBuilding.id },
+    { name: 'Room 203',                            capacity: 40, type: 'LECTURE_ROOM',        buildingId: mainBuilding.id },
+    { name: 'Room 204',                            capacity: 40, type: 'LECTURE_ROOM',        buildingId: mainBuilding.id },
+
+    // --- Main Building 3rd Floor ---
+    { name: 'Room 301',                            capacity: 40, type: 'LECTURE_ROOM',        buildingId: mainBuilding.id },
+    { name: 'Room 302',                            capacity: 40, type: 'LECTURE_ROOM',        buildingId: mainBuilding.id },
+    { name: 'Room 303',                            capacity: 40, type: 'LECTURE_ROOM',        buildingId: mainBuilding.id },
+    { name: 'Room 304',                            capacity: 40, type: 'LECTURE_ROOM',        buildingId: mainBuilding.id },
+    { name: 'Crime Laboratory Room',               capacity: 30, type: 'LABORATORY',          buildingId: mainBuilding.id },
+    { name: 'Investigation Room',                  capacity: 20, type: 'LECTURE_ROOM',        buildingId: mainBuilding.id },
+    { name: 'Faculty Office',                      capacity: 20, type: 'OFFICE',              buildingId: mainBuilding.id },
+    { name: 'Criminology Office',                  capacity: 10, type: 'OFFICE',              buildingId: mainBuilding.id },
+    { name: 'Room 305',                            capacity: 40, type: 'LECTURE_ROOM',        buildingId: mainBuilding.id },
+    { name: 'Room 306',                            capacity: 40, type: 'LECTURE_ROOM',        buildingId: mainBuilding.id },
+    { name: 'Room 307',                            capacity: 40, type: 'LECTURE_ROOM',        buildingId: mainBuilding.id },
+    { name: 'Room 308',                            capacity: 40, type: 'LECTURE_ROOM',        buildingId: mainBuilding.id },
+
+    // --- Main Building 4th Floor ---
+    { name: 'Ship Bridge Simulator Room',          capacity: 20, type: 'SIMULATOR_ROOM',      buildingId: mainBuilding.id },
+    { name: 'STO Office',                          capacity: 10, type: 'OFFICE',              buildingId: mainBuilding.id },
+    { name: 'Room 401',                            capacity: 40, type: 'LECTURE_ROOM',        buildingId: mainBuilding.id },
+    { name: 'GMDSS and Radar Room',                capacity: 20, type: 'SIMULATOR_ROOM',      buildingId: mainBuilding.id },
+    { name: 'ECDIS & Cargo Handling Room',         capacity: 20, type: 'SIMULATOR_ROOM',      buildingId: mainBuilding.id },
+    { name: 'Chart Room',                          capacity: 20, type: 'LECTURE_ROOM',        buildingId: mainBuilding.id },
+    { name: 'BSMT Room (Room 402)',                capacity: 40, type: 'LECTURE_ROOM',        buildingId: mainBuilding.id },
+
+    // --- New Building 1st Floor ---
+    { name: 'Room A-101',                          capacity: 40, type: 'LECTURE_ROOM',        buildingId: newBuilding.id },
+    { name: 'Room A-102',                          capacity: 40, type: 'LECTURE_ROOM',        buildingId: newBuilding.id },
+    { name: 'SHS Faculty Room (Room 103)',         capacity: 20, type: 'FACULTY_ROOM',        buildingId: newBuilding.id },
+    { name: 'Room A-204',                          capacity: 40, type: 'LECTURE_ROOM',        buildingId: newBuilding.id },
+    { name: 'Room A-205',                          capacity: 40, type: 'LECTURE_ROOM',        buildingId: newBuilding.id },
+    { name: 'Room A-206',                          capacity: 40, type: 'LECTURE_ROOM',        buildingId: newBuilding.id },
+    { name: 'Room A-207',                          capacity: 40, type: 'LECTURE_ROOM',        buildingId: newBuilding.id },
+    { name: 'Room A-208',                          capacity: 40, type: 'LECTURE_ROOM',        buildingId: newBuilding.id },
+    { name: 'Room A-209',                          capacity: 40, type: 'LECTURE_ROOM',        buildingId: newBuilding.id },
+
+    // --- New Building 2nd Floor ---
+    { name: 'Room A201',                           capacity: 40, type: 'LECTURE_ROOM',        buildingId: newBuilding.id },
+    { name: 'Room A202',                           capacity: 40, type: 'LECTURE_ROOM',        buildingId: newBuilding.id },
+    { name: 'Guidance / OSA (Room A203)',          capacity: 15, type: 'OFFICE',              buildingId: newBuilding.id },
+    { name: 'Room A204',                           capacity: 40, type: 'LECTURE_ROOM',        buildingId: newBuilding.id },
+    { name: 'Room A205',                           capacity: 40, type: 'LECTURE_ROOM',        buildingId: newBuilding.id },
+    { name: 'Room A206',                           capacity: 40, type: 'LECTURE_ROOM',        buildingId: newBuilding.id },
+    { name: 'Room A207',                           capacity: 40, type: 'LECTURE_ROOM',        buildingId: newBuilding.id },
+    { name: 'Room A208',                           capacity: 40, type: 'LECTURE_ROOM',        buildingId: newBuilding.id },
+    { name: 'Room A209',                           capacity: 40, type: 'LECTURE_ROOM',        buildingId: newBuilding.id },
+    { name: 'Room A210',                           capacity: 40, type: 'LECTURE_ROOM',        buildingId: newBuilding.id },
+
+    // --- New Building 3rd Floor ---
+    { name: 'Room A301',                           capacity: 40, type: 'LECTURE_ROOM',        buildingId: newBuilding.id },
+    { name: 'Room A302 - AVR / Multimedia Room',   capacity: 60, type: 'AVR',                 buildingId: newBuilding.id },
+    { name: 'Room A303',                           capacity: 40, type: 'LECTURE_ROOM',        buildingId: newBuilding.id },
+    { name: 'Room A304',                           capacity: 40, type: 'LECTURE_ROOM',        buildingId: newBuilding.id },
+    { name: 'Room A305',                           capacity: 40, type: 'LECTURE_ROOM',        buildingId: newBuilding.id },
+    { name: 'Room A306',                           capacity: 40, type: 'LECTURE_ROOM',        buildingId: newBuilding.id },
+    { name: 'Room A307',                           capacity: 40, type: 'LECTURE_ROOM',        buildingId: newBuilding.id },
+    { name: 'Room A308',                           capacity: 40, type: 'LECTURE_ROOM',        buildingId: newBuilding.id },
+    { name: 'Room A309',                           capacity: 40, type: 'LECTURE_ROOM',        buildingId: newBuilding.id },
+  ];
+
+  for (const room of allRooms) {
     const exists = await prisma.room.findFirst({
-      where: { name: room.name, buildingId: building.id },
+      where: { name: room.name, buildingId: room.buildingId },
     });
     if (!exists) {
-      await prisma.room.create({ data: { ...room, buildingId: building.id } });
+      await prisma.room.create({ data: room });
     }
   }
-  console.log('✅ Building and rooms created');
+  console.log('✅ Buildings and rooms seeded');
 
   // ─── 10. Sections ──────────────────────────────────────────────────────────
   // Naming convention: "<PROGRAM>-<YEAR_LETTER><BLOCK_NUMBER>", e.g. "BSIT-A1"

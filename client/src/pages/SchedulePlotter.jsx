@@ -259,7 +259,7 @@ const SchedulePlotter = () => {
       const config = getAuthHeaders();
       const [resSched, resRooms] = await Promise.all([
         axios.get('/api/schedules', config),
-        axios.get('/api/rooms', config),
+        axios.get('/api/rooms?schedulable=true', config),
       ]);
 
       const all = resSched.data?.data ?? [];

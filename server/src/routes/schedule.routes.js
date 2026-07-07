@@ -58,7 +58,14 @@ router.get('/options', async (req, res) => {
   try {
     const results = await Promise.allSettled([
       prisma.teacher.findMany({ include: { user: true } }),
-      prisma.room.findMany(),
+      prisma.room.findMany({
+        where: {
+          isDeleted: false,
+          type: {
+            in: ['LECTURE_ROOM', 'COMPUTER_LABORATORY', 'LABORATORY', 'AVR', 'SIMULATOR_ROOM'],
+          },
+        },
+      }),
       prisma.section.findMany(),
       prisma.subjectOffering.findMany({ include: { subject: true } }),
       prisma.schoolYear.findMany(),
@@ -252,7 +259,7 @@ router.put('/:id', async (req, res) => {
       teacherId, roomId, sectionId, subjectOfferingId,
       schoolYearId, semesterId, dayOfWeek, startTime, endTime,
     };
-
+     
     const missingFields = Object.entries(requiredFields)
       .filter(([, val]) => !val || String(val).trim() === '')
       .map(([key]) => key);

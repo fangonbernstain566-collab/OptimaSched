@@ -10,6 +10,12 @@ const VALID_ROOM_TYPES = [
   'LECTURE_ROOM',
   'COMPUTER_LABORATORY',
   'LABORATORY',
+  'OFFICE',
+  'CLINIC',
+  'LIBRARY',
+  'AVR',
+  'SIMULATOR_ROOM',
+  'FACULTY_ROOM',
 ];
 
 // Whitelist of columns the UI is allowed to sort by, mapped to the Prisma
@@ -37,6 +43,11 @@ router.get('/', async (req, res) => {
       _count: { select: { schedules: true } },
     };
     const defaultOrderBy = { name: 'asc' };
+
+    const SCHEDULABLE_TYPES = ['LECTURE_ROOM', 'COMPUTER_LABORATORY', 'LABORATORY', 'AVR', 'SIMULATOR_ROOM'];
+    if (req.query.schedulable === 'true') {
+      where.type = { in: SCHEDULABLE_TYPES };
+    }
 
     if (req.query.page === undefined) {
       const rooms = await prisma.room.findMany({ where, include, orderBy: defaultOrderBy });
