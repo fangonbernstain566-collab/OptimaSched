@@ -1,10 +1,12 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import ReactDOM from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ThemeProvider, createTheme, CssBaseline } from '@mui/material';
+import { ThemeProvider, CssBaseline, GlobalStyles } from '@mui/material';
 import { BrowserRouter } from 'react-router-dom';
 import App from './App.jsx';
 import { AuthProvider } from './context/AuthContext.jsx';
+import { SettingsProvider, useSettings } from './context/SettingsContext.jsx';
+import { buildTheme } from './theme.js';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -15,30 +17,40 @@ const queryClient = new QueryClient({
   },
 });
 
-// Clean, modern tech aesthetic configuration theme
-const theme = createTheme({
-  palette: {
-    mode: 'light',
-    primary: { main: '#1976d2' },
-    secondary: { main: '#9c27b0' },
-    background: { default: '#f5f7fa' },
-  },
-  typography: {
-    fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-  },
-});
+function ThemedApp() {
+  const { settings } = useSettings();
+  const theme = useMemo(() => buildTheme(settings), [settings]);
+
+  return (
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      {settings?.reducedMotion && (
+        <GlobalStyles
+          styles={{
+            '*': {
+              animationDuration: '0s !important',
+              animationDelay: '0s !important',
+              transitionDuration: '0s !important',
+              transitionDelay: '0s !important',
+            },
+          }}
+        />
+      )}
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>
+    </ThemeProvider>
+  );
+}
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider theme={theme}>
-        <CssBaseline />
-        <BrowserRouter>
-          <AuthProvider>
-            <App />
-          </AuthProvider>
-        </BrowserRouter>
-      </ThemeProvider>
+      <AuthProvider>
+        <SettingsProvider>
+          <ThemedApp />
+        </SettingsProvider>
+      </AuthProvider>
     </QueryClientProvider>
   </React.StrictMode>
 );

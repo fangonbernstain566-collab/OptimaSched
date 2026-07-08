@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import NotificationBell from '../components/NotificationBell';
 import {
   Box, Drawer, AppBar, Toolbar, List, Typography, Divider,
   IconButton, ListItem, ListItemButton, ListItemIcon, ListItemText,
@@ -17,7 +18,15 @@ import {
   People           as TeacherIcon,
   MeetingRoom      as RoomIcon,
   History          as AuditIcon,
+  Settings         as SettingsIcon,
   Logout           as LogoutIcon,
+  Payments         as PaymentsIcon,
+  School           as FacultyIcon,
+  MenuBook         as ClassListIcon,
+  Assessment       as ReportsIcon,
+  AutoAwesome      as TimmyIcon,
+  EventAvailable   as AvailIcon,
+  PendingActions   as RequestsIcon,
   ChevronLeft,   // ✅ FIX 3: added for collapse toggle button
   ChevronRight,  // ✅ FIX 3: added for collapse toggle button
   KeyboardArrowRight as CaretIcon,
@@ -25,8 +34,8 @@ import {
   ExpandMore,
 } from '@mui/icons-material';
 
-// ─── Design tokens — matches Login.jsx ───────────────────────────────────────
-const C = {
+// ─── Design tokens — matches Login.jsx, adapted per theme mode ──────────────
+const LIGHT_TOKENS = {
   primary:      '#1B2B5E',
   accent:       '#C49A3C',
   accentLight:  'rgba(196, 154, 60, 0.12)',
@@ -41,6 +50,23 @@ const C = {
   sidebarActive:'rgba(255,255,255,0.08)',
 };
 
+const DARK_TOKENS = {
+  primary:      '#E8E4D9',
+  accent:       '#C49A3C',
+  accentLight:  'rgba(196, 154, 60, 0.18)',
+  background:   '#0f172a',
+  card:         '#1e293b',
+  secondary:    '#111a2e',
+  muted:        '#94a3b8',
+  border:       'rgba(232, 228, 217, 0.10)',
+  sidebarBg:    '#0b1330',
+  sidebarText:  'rgba(255,255,255,0.75)',
+  sidebarHover: 'rgba(255,255,255,0.06)',
+  sidebarActive:'rgba(255,255,255,0.08)',
+};
+
+const getTokens = (mode) => (mode === 'dark' ? DARK_TOKENS : LIGHT_TOKENS);
+
 const DRAWER_WIDTH    = 260;
 const COLLAPSED_WIDTH = 76;
 
@@ -52,26 +78,50 @@ const NAV_ITEMS = [
     text:  'Dashboard View',
     path:  '/dashboard',
     icon:  <DashIcon fontSize="small" />,
-    roles: ['ADMINISTRATOR', 'REGISTRAR_SCHEDULER', 'INSTRUCTOR', 'STUDENT'],
+    roles: ['ADMINISTRATOR', 'INSTRUCTOR', 'STUDENT'],
+  },
+  {
+    text:  'My Schedules',
+    path:  '/my-schedules',
+    icon:  <SchedIcon fontSize="small" />,
+    roles: ['INSTRUCTOR'],
+  },
+  {
+    text:  'My Availability',
+    path:  '/instructor/availability',
+    icon:  <AvailIcon fontSize="small" />,
+    roles: ['INSTRUCTOR'],
+  },
+  {
+    text:  'Ask Timmy',
+    path:  '/instructor/timmy',
+    icon:  <TimmyIcon fontSize="small" />,
+    roles: ['INSTRUCTOR'],
   },
   {
     text:  'Manage Schedules',
     path:  '/schedules',
     icon:  <SchedIcon fontSize="small" />,
-    roles: ['ADMINISTRATOR', 'REGISTRAR_SCHEDULER'],
+    roles: ['ADMINISTRATOR'],
   },
   // ✅ FIX 1: removed duplicate "Manage Schedules" entry that was here
   {
     text:  'Schedule Plotter',
     path:  '/schedules/plotter',
     icon:  <PlotterIcon fontSize="small" />,
+    roles: ['ADMINISTRATOR'],
+  },
+  {
+    text:  'Schedule Requests',
+    path:  '/schedule-requests',
+    icon:  <RequestsIcon fontSize="small" />,
     roles: ['ADMINISTRATOR', 'REGISTRAR_SCHEDULER'],
   },
   {
     text:  'Manage Teachers',
     path:  '/teachers',
     icon:  <TeacherIcon fontSize="small" />,
-    roles: ['ADMINISTRATOR', 'REGISTRAR_SCHEDULER'],
+    roles: ['ADMINISTRATOR'],
   },
   {
     text:  'Manage Rooms',
@@ -80,9 +130,81 @@ const NAV_ITEMS = [
     roles: ['ADMINISTRATOR'],
   },
   {
+    text:  'Audit Logs',
+    path:  '/audit-logs',
+    icon:  <AuditIcon fontSize="small" />,
+    roles: ['ADMINISTRATOR'],
+  },
+  {
+    text:  'Payment Dashboard',
+    path:  '/cashier/dashboard',
+    icon:  <PaymentsIcon fontSize="small" />,
+    roles: ['CASHIER'],
+  },
+  {
+    text:  'Manage Faculty',
+    path:  '/cashier/faculty',
+    icon:  <FacultyIcon fontSize="small" />,
+    roles: ['CASHIER'],
+  },
+  {
+    text:  'Manage Class List',
+    path:  '/cashier/classes',
+    icon:  <ClassListIcon fontSize="small" />,
+    roles: ['CASHIER'],
+  },
+  {
+    text:  'View Schedule',
+    path:  '/cashier/schedule',
+    icon:  <SchedIcon fontSize="small" />,
+    roles: ['CASHIER'],
+  },
+  {
+    text:  'Reports',
+    path:  '/cashier/reports',
+    icon:  <ReportsIcon fontSize="small" />,
+    roles: ['CASHIER'],
+  },
+  {
+    text:  'Ask Timmy',
+    path:  '/cashier/timmy',
+    icon:  <TimmyIcon fontSize="small" />,
+    roles: ['CASHIER'],
+  },
+  {
+    text:  'Registrar Dashboard',
+    path:  '/registrar/dashboard',
+    icon:  <DashIcon fontSize="small" />,
+    roles: ['REGISTRAR_SCHEDULER'],
+  },
+  {
+    text:  'Manage Faculty',
+    path:  '/registrar/faculty',
+    icon:  <FacultyIcon fontSize="small" />,
+    roles: ['REGISTRAR_SCHEDULER'],
+  },
+  {
+    text:  'Manage Class List',
+    path:  '/registrar/classes',
+    icon:  <ClassListIcon fontSize="small" />,
+    roles: ['REGISTRAR_SCHEDULER'],
+  },
+  {
+    text:  'View Schedule',
+    path:  '/registrar/schedule',
+    icon:  <SchedIcon fontSize="small" />,
+    roles: ['REGISTRAR_SCHEDULER'],
+  },
+  {
+    text:  'Ask Timmy',
+    path:  '/registrar/timmy',
+    icon:  <TimmyIcon fontSize="small" />,
+    roles: ['REGISTRAR_SCHEDULER'],
+  },
+  {
     text:  'Recently Deleted',
     icon:  <TrashIcon fontSize="small" />,
-    roles: ['ADMINISTRATOR', 'REGISTRAR_SCHEDULER'],
+    roles: ['ADMINISTRATOR', 'REGISTRAR_SCHEDULER', 'CASHIER', 'INSTRUCTOR'],
     children: [
       {
         text:  'Deleted Schedules',
@@ -99,13 +221,17 @@ const NAV_ITEMS = [
         path:  '/rooms/recently-deleted',
         roles: ['ADMINISTRATOR'],
       },
+      {
+        text:  'Deleted Payments',
+        path:  '/cashier/recently-deleted',
+        roles: ['CASHIER'],
+      },
+      {
+        text:  'Deleted Requests',
+        path:  '/instructor/recently-deleted',
+        roles: ['INSTRUCTOR'],
+      },
     ],
-  },
-  {
-    text:  'Audit Logs',
-    path:  '/audit-logs',
-    icon:  <AuditIcon fontSize="small" />,
-    roles: ['ADMINISTRATOR'],
   },
 ];
 
@@ -115,6 +241,7 @@ export default function DashboardLayout() {
   const navigate                    = useNavigate();
   const location                    = useLocation();
   const theme                       = useTheme();
+  const C                           = getTokens(theme.palette.mode);
   const isDesktop                   = useMediaQuery(theme.breakpoints.up('md'));
   const [mobileOpen, setMobileOpen]         = useState(false);
   const [collapsed, setCollapsed]           = useState(false);
@@ -496,9 +623,32 @@ export default function DashboardLayout() {
         })}
       </List>
 
-      {/* ── Logout ────────────────────────────────────────────────────────── */}
+      {/* ── Settings + Logout ─────────────────────────────────────────────── */}
       <Box sx={{ p: 2 }}>
         <Divider sx={{ borderColor: 'rgba(255,255,255,0.07)', mb: 2 }} />
+        <Tooltip title={collapsed ? 'Settings' : ''} placement="right">
+          <Button
+            fullWidth
+            onClick={() => { navigate('/settings'); setMobileOpen(false); }}
+            startIcon={collapsed ? null : <SettingsIcon />}
+            sx={{
+              justifyContent: collapsed ? 'center' : 'flex-start',
+              minWidth:       0,
+              px:             1.5,
+              py:             1,
+              mb:             0.5,
+              borderRadius:   '8px',
+              color:          location.pathname === '/settings' ? '#fff' : C.sidebarText,
+              bgcolor:        location.pathname === '/settings' ? C.accentLight : 'transparent',
+              fontSize:       '0.825rem',
+              fontWeight:     500,
+              textTransform:  'none',
+              '&:hover':      { bgcolor: C.sidebarHover },
+            }}
+          >
+            {collapsed ? <SettingsIcon fontSize="small" /> : 'Settings'}
+          </Button>
+        </Tooltip>
         <Tooltip title={collapsed ? 'Disconnect Session' : ''} placement="right">
           <Button
             fullWidth
@@ -580,6 +730,11 @@ export default function DashboardLayout() {
             <Typography sx={{ color: C.muted, fontSize: '0.7rem', fontWeight: 600, letterSpacing: '0.04em' }}>
               A.Y. 2026–2027
             </Typography>
+          </Box>
+
+          {/* Notifications */}
+          <Box sx={{ color: C.primary }}>
+            <NotificationBell />
           </Box>
 
           {/* User avatar */}

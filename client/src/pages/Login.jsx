@@ -41,8 +41,14 @@ const FEATURES = [
   'Exportable class schedule reports',
 ];
 
-// Role toggle is cosmetic only — backend determines role from the DB
-const ROLES = ['faculty', 'admin', 'registrar'];
+// Role toggle gates login — selected tab must match the account's actual
+// role (returned by the backend) or the sign-in is rejected client-side.
+const ROLES = [
+  { value: 'faculty',   label: 'Faculty',   roleName: 'INSTRUCTOR' },
+  { value: 'admin',     label: 'Admin',     roleName: 'ADMINISTRATOR' },
+  { value: 'registrar', label: 'Registrar', roleName: 'REGISTRAR_SCHEDULER' },
+  { value: 'cashier',   label: 'Cashier',   roleName: 'CASHIER' },
+];
 
 // ─── Shared MUI TextField sx override ────────────────────────────────────────
 const inputSx = {
@@ -79,6 +85,15 @@ export default function Login() {
       return response.data;
     },
     onSuccess: (data) => {
+      const selectedRole = ROLES.find((r) => r.value === role);
+      if (selectedRole && data.user.role !== selectedRole.roleName) {
+        setError('root.serverError', {
+          type:    'manual',
+          message: 'Invalid credentials for this sign-in type.',
+        });
+        return;
+      }
+
       login(data.user, data.token);  // saves to localStorage under 'optimasched_token'
       navigate('/dashboard');
     },
@@ -294,10 +309,10 @@ export default function Login() {
           >
             {ROLES.map((r) => (
               <Box
-                key={r}
+                key={r.value}
                 component="button"
                 type="button"
-                onClick={() => setRole(r)}
+                onClick={() => setRole(r.value)}
                 sx={{
                   flex:          1,
                   py:            1,
@@ -308,12 +323,12 @@ export default function Login() {
                   letterSpacing: '0.08em',
                   textTransform: 'uppercase',
                   transition:    'all 0.2s',
-                  bgcolor:       role === r ? C.primary : 'transparent',
-                  color:         role === r ? '#fff' : C.muted,
-                  '&:hover':     { color: role === r ? '#fff' : C.primary },
+                  bgcolor:       role === r.value ? C.primary : 'transparent',
+                  color:         role === r.value ? '#fff' : C.muted,
+                  '&:hover':     { color: role === r.value ? '#fff' : C.primary },
                 }}
               >
-                {r}
+                {r.label}
               </Box>
             ))}
           </Box>

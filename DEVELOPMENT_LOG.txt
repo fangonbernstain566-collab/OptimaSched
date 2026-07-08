@@ -92,3 +92,585 @@ Git Commit
 2026-07-06 - Add curriculum-based subject/class-code filtering to schedule creation and a live timetable allocation progress widget
 
 ============================================================
+
+============================================================
+Date: 2026-07-08
+Feature: Accessibility & Common Settings
+============================================================
+
+## Feature Summary
+Added a real, per-user Settings page covering accessibility (theme mode, font size, high contrast, reduced motion) and general preferences (notifications, default landing page), plus self-service profile editing. Settings persist to the database per account and actually drive the live MUI theme app-wide, rather than being cosmetic controls.
+
+## Changes Made
+### Frontend
+- New `Settings.jsx` page with Accessibility, General, and Profile sections.
+- New `SettingsContext.jsx` provides settings app-wide; `main.jsx` restructured so `ThemedApp` builds the MUI theme from live settings via `buildTheme()`.
+- `theme.js` rewritten from a static theme export into `buildTheme(settings)` — dark/light/system mode, font-size scaling, a high-contrast palette variant, and zeroed transitions for reduced motion.
+- `DashboardLayout.jsx` — sidebar color tokens converted to `getTokens(mode)` so dark mode actually reapplies the sidebar; added a standalone "Settings" button above "Disconnect Session".
+- `AuthContext.jsx` — added `updateUser()` so profile edits reflect immediately in the sidebar without re-login.
+
+### Backend
+- New `settings.service.js` / `settings.controller.js` / `settings.routes.js` — `GET/PATCH /api/settings/me` (lazy-creates defaults on first read), `PATCH /api/settings/me/profile` for name/email.
+
+### Database
+- Added `UserSettings` model (themeMode, fontSize, highContrast, reducedMotion, emailNotifications, inAppNotifications, defaultLandingPage), 1:1 with `User`.
+
+### API
+- New: `GET /api/settings/me`, `PATCH /api/settings/me`, `PATCH /api/settings/me/profile`
+
+### Validation
+- Profile email update checks for uniqueness against other users before saving.
+
+### Bug Fixes
+- None.
+
+## Technical Flow
+1. On login, `SettingsProvider` fetches `/api/settings/me` (auto-creating a default row if none exists).
+2. `ThemedApp` rebuilds the MUI theme via `buildTheme(settings)` whenever settings change, so toggling dark mode/font size/high contrast/reduced motion applies live, app-wide.
+3. Settings page writes changes via `PATCH /api/settings/me`; profile edits go through `PATCH /api/settings/me/profile` and immediately update `AuthContext`.
+
+## Files Created
+- client/src/pages/Settings.jsx
+- client/src/context/SettingsContext.jsx
+- client/src/services/settingsApi.js
+- server/src/services/settings.service.js
+- server/src/controllers/settings.controller.js
+- server/src/routes/settings.routes.js
+
+## Files Modified
+- client/src/main.jsx
+- client/src/theme.js
+- client/src/layouts/DashboardLayout.jsx
+- client/src/context/AuthContext.jsx
+- client/src/App.jsx
+- server/src/app.js
+- server/prisma/schema.prisma
+
+## Database Changes
+- Added `UserSettings` table (1:1 with `User`)
+- Added `ThemeMode` enum (LIGHT, DARK, SYSTEM)
+- Added `FontSize` enum (SMALL, MEDIUM, LARGE)
+
+## API Endpoints
+- GET /api/settings/me
+- PATCH /api/settings/me
+- PATCH /api/settings/me/profile
+
+## Testing Checklist
+- [x] Toggling theme mode/font size/high contrast/reduced motion applies live and persists across logout/login
+- [x] Two different users have independent settings
+- [x] Profile name/email edit updates sidebar immediately
+
+## Notes
+- Sidebar dark-mode support only covers `DashboardLayout.jsx`'s own tokens; other custom-styled pages (e.g. `Login.jsx`) are out of scope for this pass.
+
+============================================================
+Feature: Role-Gated Login with Cashier Support
+============================================================
+
+## Feature Summary
+The login page's role tab (Faculty/Admin/Registrar) was purely cosmetic — any account could sign in regardless of the selected tab. Added a Cashier tab and made the tab selection actually gate login: if the account's real role doesn't match the selected tab, sign-in is rejected client-side even with correct credentials, with a generic (non-role-leaking) error message.
+
+## Changes Made
+### Frontend
+- `Login.jsx` — `ROLES` now maps each tab to its real `RoleName`; added `CASHIER`; `onSuccess` compares the server-returned role against the selected tab and blocks login with a generic error on mismatch.
+
+### Backend
+- None (uses existing `/api/auth/login`, which already returns the account's real role).
+
+### Database
+- None.
+
+### API
+- None (no endpoint changes).
+
+### Validation
+- Client-side role-tab-vs-account-role check before completing login.
+
+### Bug Fixes
+- Fixed `registrar@pclu.edu.ph` / `cashier@pclu.edu.ph` accounts existing in `seed.js` but never actually created in the dev database — re-ran the seed to create them (idempotent `upsert`, did not touch the existing admin password).
+
+## Technical Flow
+1. User selects a role tab and submits credentials.
+2. On successful `POST /api/auth/login`, the frontend compares `data.user.role` against the selected tab's expected role.
+3. Mismatch → login rejected with "Invalid credentials for this sign-in type." (does not reveal the account's actual role). Match → proceeds as before.
+
+## Files Created
+- None.
+
+## Files Modified
+- client/src/pages/Login.jsx
+
+## Database Changes
+- None (seed data creation only, no schema change).
+
+## API Endpoints
+- None (reused existing /api/auth/login).
+
+## Testing Checklist
+- [x] Admin credentials + Faculty tab selected → login blocked
+- [x] Each of Admin/Registrar/Cashier/Instructor logs in successfully via their correct tab
+
+## Notes
+- None.
+
+============================================================
+Feature: Timmy — AI Scheduling Recommendation Engine
+============================================================
+
+## Feature Summary
+Added "Timmy," a deterministic (no ML) room/time recommendation engine for Schedule Plotter. Given a PENDING schedule, it enumerates every room x day x time-slot combination, filters out anything that violates a hard constraint (room type/capacity, teacher declared availability, teacher/room/section conflicts, teaching load), scores the rest, and returns the top 3 with plain-language reasons. Later upgraded from a blocking modal to an inline side panel with on-grid highlighting so the plotter stays fully visible while reviewing recommendations.
+
+## Changes Made
+### Frontend
+- `SchedulePlotter.jsx` — "Ask Timmy" button per pending card; collapsible side panel (not a blocking modal) showing ranked recommendations with Capacity/Equipment/Conflict/Availability fields; matching rank-colored highlight overlays directly on the room/time grid; click-to-locate scrolls + pulses the corresponding cell; "Apply" routes through the existing Confirm Placement modal (Timmy never writes directly).
+- New `timmyApi.js` service wrapper.
+
+### Backend
+- New `timmy.service.js` — `recommendSlots(scheduleId)`: candidate generation, hard-constraint filtering, scoring, top-3 selection with `capacityMatch`, `equipmentMatch`, `conflictStatus`, `availability`, and `rank` fields.
+- New `timmy.controller.js` / `timmy.routes.js` — `POST /api/timmy/recommend`, gated to ADMINISTRATOR/REGISTRAR_SCHEDULER.
+
+### Database
+- None (read-only against existing Schedule/Room/Teacher/Availability data).
+
+### API
+- New: `POST /api/timmy/recommend`
+
+### Validation
+- Server-side zod validation on the request body (`scheduleId` must be a UUID).
+
+### Bug Fixes
+- Fixed a rank-color bug where all pulsing highlight cells shared one global `@keyframes` definition, so only the last-rendered rank's color would actually apply; moved to a single fixed-color `GlobalStyles` keyframe.
+
+## Technical Flow
+1. User clicks "Ask Timmy" on a pending schedule card.
+2. `POST /api/timmy/recommend` enumerates candidates, filters hard constraints, scores and ranks them, returns top 3.
+3. Side panel + grid highlights render simultaneously; plotter remains interactive.
+4. User clicks "Apply" on a recommendation → existing Confirm Placement modal → `PUT /api/schedules/:id` places it for real.
+
+## Files Created
+- server/src/services/timmy.service.js
+- server/src/controllers/timmy.controller.js
+- server/src/routes/timmy.routes.js
+- client/src/services/timmyApi.js
+
+## Files Modified
+- client/src/pages/SchedulePlotter.jsx
+- server/src/app.js
+
+## Database Changes
+- None.
+
+## API Endpoints
+- POST /api/timmy/recommend
+
+## Testing Checklist
+- [x] Lab-required subject correctly filtered to lab-type rooms only
+- [x] Recommendations respect capacity, teacher availability, and existing conflicts
+- [x] Applying a recommendation places a real, correctly conflict-free schedule
+
+## Notes
+- Scoring weights (capacity fit, 9am time preference, day-load spread) are a tunable heuristic, not a hard requirement.
+
+============================================================
+Feature: Cashier Dashboard (Payments Module)
+============================================================
+
+## Feature Summary
+Built out the Cashier role from scratch — previously had no dedicated pages. Added a real `Payment` model and a full Cashier module: Payment Dashboard (stat cards, weekly/type charts, transactions table, New Payment modal), and read-only Faculty/Class List/Schedule views reusing existing Admin/Registrar data endpoints (no new backend needed for those three).
+
+## Changes Made
+### Frontend
+- New `client/src/pages/cashier/`: `CashierDashboard.jsx`, `CashierFaculty.jsx`, `CashierClasses.jsx`, `CashierSchedule.jsx`, `CashierReports.jsx`.
+- New `paymentApi.js` service wrapper.
+- Added `recharts` dependency for charts.
+- 5 new `/cashier/*` routes gated to CASHIER, 5 new sidebar nav entries.
+
+### Backend
+- New `payment.service.js` / `payment.controller.js` / `payment.routes.js` — create/list/update-status/stats, gated to CASHIER + ADMINISTRATOR.
+
+### Database
+- Added `Payment` model (studentName, studentId as free text — no Student entity exists to key off; amount, type, method, status, cashierId, notes) with `PaymentType`, `PaymentMethod`, `PaymentStatus` enums.
+
+### API
+- New: `GET /api/payments/stats`, `GET /api/payments`, `POST /api/payments`, `PATCH /api/payments/:id/status`
+
+### Validation
+- zod validation on payment creation (amount > 0, valid type/method/status enums).
+
+### Bug Fixes
+- Fixed `/api/rooms` requiring ADMINISTRATOR for even plain GET/listing — was silently blocking Registrar's own Schedule Plotter room fetches too. Split so listing is open to any authenticated user; create/update/delete remain admin-only.
+
+## Technical Flow
+1. Cashier records a payment via the New Payment modal → `POST /api/payments`.
+2. Dashboard stats (`GET /api/payments/stats`) aggregate today's collections, pending/confirmed counts, outstanding students, weekly/monthly totals, and type/method breakdowns from real Payment rows.
+3. Faculty/Class List/Schedule pages read directly from existing `/api/teachers`, `/api/schedules`, `/api/rooms` — no mock data.
+
+## Files Created
+- client/src/pages/cashier/CashierDashboard.jsx, CashierFaculty.jsx, CashierClasses.jsx, CashierSchedule.jsx, CashierReports.jsx
+- client/src/services/paymentApi.js
+- server/src/services/payment.service.js
+- server/src/controllers/payment.controller.js
+- server/src/routes/payment.routes.js
+
+## Files Modified
+- client/src/App.jsx
+- client/src/layouts/DashboardLayout.jsx
+- client/package.json / package-lock.json (added recharts)
+- server/src/app.js
+- server/src/routes/room.routes.js
+- server/prisma/schema.prisma
+
+## Database Changes
+- Added `Payment` table
+- Added `PaymentType`, `PaymentMethod`, `PaymentStatus` enums
+
+## API Endpoints
+- GET /api/payments/stats
+- GET /api/payments
+- POST /api/payments
+- PATCH /api/payments/:id/status
+
+## Testing Checklist
+- [x] Recording a payment updates stat cards and transactions table
+- [x] Confirming a PENDING payment updates status and stats
+- [x] Cashier can read Faculty/Class List/Schedule with no edit controls
+- [x] Room-access fix verified: Cashier/Registrar can list rooms, only Admin can mutate
+
+## Notes
+- Payments were built with genuinely new backend/schema, per explicit scoping decision, rather than mock data.
+
+============================================================
+Feature: Registrar Dashboard
+============================================================
+
+## Feature Summary
+Built a dedicated Registrar module (Dashboard, Manage Faculty, Manage Class List, View Schedule) — entirely frontend, reusing existing real data (`/api/teachers`, `/api/schedules`, `/api/schedules/options`) with no new backend or schema needed, per explicit scoping decision to avoid inventing unused fields (no fake faculty "status" badge, no fake per-student ID/status).
+
+## Changes Made
+### Frontend
+- New `client/src/pages/registrar/`: `RegistrarDashboard.jsx` (real stat cards + reused `TimetableAllocationProgress` component), `RegistrarFaculty.jsx` (search/filter over real `/api/teachers`, Add Faculty), `RegistrarClassList.jsx` (flattens real `enrolledStudents` per class into a searchable roster), `RegistrarSchedule.jsx` (read-only weekly grid with a real Faculty filter).
+- 4 new `/registrar/*` routes gated to REGISTRAR_SCHEDULER, 4 new sidebar nav entries.
+
+### Backend
+- None (pure reuse of existing endpoints).
+
+### Database
+- None.
+
+### API
+- None (no new endpoints).
+
+### Validation
+- None beyond what existing reused endpoints already validate.
+
+### Bug Fixes
+- None beyond the `/api/rooms` access fix already covered under the Cashier Dashboard entry (benefits Registrar too).
+
+## Technical Flow
+1. Registrar Dashboard combines `/api/schedules`, `/api/schedules/options`, and `/api/teachers` client-side to compute enrolled-student totals, pending-schedule counts, section counts, and faculty counts.
+2. Manage Class List flattens each `Schedule.enrolledStudents` array into one row per student, joined with `Section.program`/`yearLevel` for course/year display.
+
+## Files Created
+- client/src/pages/registrar/RegistrarDashboard.jsx, RegistrarFaculty.jsx, RegistrarClassList.jsx, RegistrarSchedule.jsx
+
+## Files Modified
+- client/src/App.jsx
+- client/src/layouts/DashboardLayout.jsx
+
+## Database Changes
+- None.
+
+## API Endpoints
+- None (reused existing endpoints).
+
+## Testing Checklist
+- [x] All 4 pages load real seeded data, not mock data
+- [x] Add Faculty via Registrar successfully creates a real Teacher record
+
+## Notes
+- None.
+
+============================================================
+Feature: Role-Specific Timmy Variants + Sidebar Reorganization
+============================================================
+
+## Feature Summary
+Extended Timmy beyond scheduling into two new, genuinely different capabilities per role: outstanding-payment follow-up ranking for Cashier, and teaching-load/tight-transition warnings for Instructor. Also reorganized the Registrar sidebar (removed redundant Admin-only management pages, moved "Recently Deleted" to the bottom) per user request.
+
+## Changes Made
+### Frontend
+- New `RegistrarTimmy.jsx` — dedicated "Ask Timmy" page for Registrar (pending queue → recommendations → apply), since Schedule Plotter was hidden from their nav.
+- New `CashierTimmy.jsx` — ranked list of outstanding (PENDING) payments by follow-up priority, with inline Confirm action.
+- New `InstructorTimmy.jsx` — teaching-load bar + tight-transition warnings for the logged-in instructor's own schedule.
+- `DashboardLayout.jsx` — removed REGISTRAR_SCHEDULER from Dashboard View/Manage Schedules/Schedule Plotter/Manage Teachers nav items (route-level access unchanged, nav-only declutter); moved "Recently Deleted" to the end of the nav array so it renders last for every role that has it.
+
+### Backend
+- New `timmyPayments.service.js` — `getOutstandingInsights()`: ranks PENDING payments by `age*10 + amount/1000`.
+- New `timmyInstructor.service.js` — `getInstructorInsights(userId)`: teaching load vs. max, and same-day different-room transitions under 15 minutes.
+- `timmy.controller.js` / `timmy.routes.js` — added `getPaymentInsights`, `getInstructorInsights`; restructured from one blanket `authorize()` to per-route authorization (scheduling → Admin/Registrar, payments → Cashier/Admin, instructor → Instructor only).
+
+### Database
+- None.
+
+### API
+- New: `GET /api/timmy/payments/insights`, `GET /api/timmy/instructor/insights`
+
+### Validation
+- None beyond role authorization per route.
+
+### Bug Fixes
+- None.
+
+## Technical Flow
+1. Cashier/Instructor open their "Ask Timmy" page → `GET /api/timmy/{payments,instructor}/insights` computes and returns ranked/flagged real data.
+2. Registrar's "Ask Timmy" reuses the existing `POST /api/timmy/recommend` scheduling engine with its own dedicated UI.
+
+## Files Created
+- client/src/pages/registrar/RegistrarTimmy.jsx
+- client/src/pages/cashier/CashierTimmy.jsx
+- client/src/pages/instructor/InstructorTimmy.jsx
+- server/src/services/timmyPayments.service.js
+- server/src/services/timmyInstructor.service.js
+
+## Files Modified
+- client/src/App.jsx
+- client/src/layouts/DashboardLayout.jsx
+- server/src/controllers/timmy.controller.js
+- server/src/routes/timmy.routes.js
+
+## Database Changes
+- None.
+
+## API Endpoints
+- GET /api/timmy/payments/insights
+- GET /api/timmy/instructor/insights
+
+## Testing Checklist
+- [x] Cashier sees ranked outstanding payments matching real PENDING records
+- [x] Instructor sees real teaching load percentage and any real tight-transition warnings
+- [x] Cross-role 403s confirmed (Cashier can't hit instructor insights, Registrar can't hit payment insights)
+- [x] Registrar retains access to the original scheduling recommend endpoint after route restructuring
+
+## Notes
+- None.
+
+============================================================
+Feature: Instructor Availability & Real Schedule Request Workflow
+============================================================
+
+## Feature Summary
+Replaced the fully mocked "Request a Schedule Slot" feature (previously wrote only to `localStorage`, never reached the backend) with a real, end-to-end workflow: instructors declare weekly Availability and submit real Schedule Requests; Admin/Registrar review and approve/reject them; approving automatically validates conflicts and creates the real `Schedule` row — no manual re-entry.
+
+## Changes Made
+### Frontend
+- New `InstructorAvailability.jsx` — declare/remove weekly availability windows.
+- `InstructorSchedules.jsx` rewritten — request form now selects a real Subject Offering + Section (was free text) and submits to the real backend instead of `localStorage`; cancel/list of "Your Schedule Requests" now backend-wired.
+- New `ScheduleRequests.jsx` — Admin/Registrar review queue with Approve (room picker) / Reject (reason) modals.
+- New `availabilityApi.js`, `scheduleRequestApi.js` service wrappers.
+
+### Backend
+- New `availability.routes.js` — self-service `GET /me`, `POST /`, `DELETE /:id` scoped to the logged-in instructor's own Teacher record.
+- New `scheduleRequest.routes.js` — `GET/POST /mine`, `DELETE /:id` (cancel), `GET /` + `PATCH /:id/approve` + `PATCH /:id/reject` for Admin/Registrar. Approval reuses `ScheduleConflictService.validateSchedule` and creates the real `Schedule` row in one transaction.
+
+### Database
+- Added `ScheduleRequest` model (teacherId, subjectOfferingId, sectionId, roomId (optional), day/time, studentCount, notes, status, reviewedById, reviewNotes, resultingScheduleId).
+- Added `RequestStatus` enum (PENDING, APPROVED, REJECTED).
+
+### API
+- New: `GET/POST /api/availability`, `GET /api/availability/me`, `DELETE /api/availability/:id`
+- New: `GET/POST /api/schedule-requests`, `GET /api/schedule-requests/mine`, `DELETE /api/schedule-requests/:id`, `PATCH /api/schedule-requests/:id/approve`, `PATCH /api/schedule-requests/:id/reject`
+
+### Validation
+- Approval blocked (400) if no room is assigned; conflict validation (409) reuses the same rules as manual schedule placement (room/teacher/section overlap, teacher availability, teaching load).
+
+### Bug Fixes
+- Fixed `scheduleConflict.service.js` bare-instantiating `new PrismaClient()` with no adapter config — incompatible with this project's Prisma 7 driver-adapter setup. It was previously dead code (nothing live imported it), so the bug was latent; crashed the server the moment `scheduleRequest.routes.js` actually imported it. Fixed to use the shared configured Prisma client.
+- Fixed the approve endpoint's response returning a stale `resultingScheduleId: null` even though the DB was correctly updated (two separate `update` calls, response captured before the second). Fixed by combining into one interactive transaction.
+
+## Technical Flow
+1. Instructor adds Availability windows and submits a Schedule Request (real Subject Offering + Section + preferred room/day/time).
+2. Admin/Registrar sees it in the review queue → Approve (assigns/confirms room) → backend validates conflicts via `ScheduleConflictService` → on success, creates a real `SCHEDULED` `Schedule` row and marks the request `APPROVED` with `resultingScheduleId` set, all in one transaction.
+3. Reject → request marked `REJECTED` with optional reviewer notes, visible to the instructor.
+
+## Files Created
+- client/src/pages/instructor/InstructorAvailability.jsx
+- client/src/pages/ScheduleRequests.jsx
+- client/src/services/availabilityApi.js
+- client/src/services/scheduleRequestApi.js
+- server/src/routes/availability.routes.js
+- server/src/routes/scheduleRequest.routes.js
+
+## Files Modified
+- client/src/pages/InstructorSchedules.jsx
+- client/src/App.jsx
+- client/src/layouts/DashboardLayout.jsx
+- server/src/app.js
+- server/src/services/scheduleConflict.service.js
+- server/prisma/schema.prisma
+
+## Database Changes
+- Added `ScheduleRequest` table
+- Added `RequestStatus` enum (PENDING, APPROVED, REJECTED)
+
+## API Endpoints
+- GET/POST /api/availability, GET /api/availability/me, DELETE /api/availability/:id
+- GET/POST /api/schedule-requests, GET /api/schedule-requests/mine, DELETE /api/schedule-requests/:id
+- PATCH /api/schedule-requests/:id/approve, PATCH /api/schedule-requests/:id/reject
+
+## Testing Checklist
+- [x] Instructor adds availability, appears correctly grouped by day
+- [x] Submitting a request that conflicts with the instructor's existing schedule is correctly rejected at approval time
+- [x] Submitting for a free slot and approving creates a real SCHEDULED class
+- [x] Reject path returns reviewer notes to the instructor
+- [x] Server boots cleanly after the PrismaClient fix
+
+## Notes
+- Reviewable by both Admin and Registrar (matching their existing shared scheduling permissions), a scope call made without re-confirming since it followed directly from prior established role boundaries.
+
+============================================================
+Feature: Recently Deleted — Extended to Cashier & Instructor
+============================================================
+
+## Feature Summary
+Extended the existing Admin/Registrar "Recently Deleted" (soft-delete + restore + permanent-delete) pattern to Cashier (Payments) and Instructor (cancelled Schedule Requests) — both previously had no delete capability at all on their own data.
+
+## Changes Made
+### Frontend
+- `CashierDashboard.jsx` — added a Delete action to the transactions table.
+- New `CashierRecentlyDeleted.jsx` — restore/permanently-delete soft-deleted payments.
+- `InstructorSchedules.jsx` cancel action now soft-deletes instead of hard-deleting (backend change only, same UI flow).
+- New `InstructorRecentlyDeleted.jsx` — restore a cancelled request back to PENDING, or permanently delete it.
+- "Recently Deleted" sidebar group now shows different children per role (Deleted Payments for Cashier, Deleted Requests for Instructor, existing entries for Admin/Registrar).
+
+### Backend
+- `payment.service.js`/`controller.js`/`routes.js` — added soft-delete/restore/permanent-delete/list-deleted; `list()` and `getStats()` now filter `isDeleted: false` by default.
+- `scheduleRequest.routes.js` — cancel (`DELETE /:id`) now soft-deletes; added `GET /mine/recently-deleted`, `PATCH /:id/restore`, `DELETE /:id/permanent`; active-list queries now filter `isDeleted: false`.
+
+### Database
+- Added `Payment.isDeleted` (Boolean, default false), `Payment.deletedAt` (DateTime?)
+- Added `ScheduleRequest.isDeleted` (Boolean, default false), `ScheduleRequest.deletedAt` (DateTime?)
+
+### API
+- New: `DELETE /api/payments/:id`, `PATCH /api/payments/:id/restore`, `DELETE /api/payments/:id/permanent`, `GET /api/payments/recently-deleted`
+- New: `GET /api/schedule-requests/mine/recently-deleted`, `PATCH /api/schedule-requests/:id/restore`, `DELETE /api/schedule-requests/:id/permanent`
+
+### Validation
+- Restore/permanent-delete both verify ownership (instructor can only restore their own requests) and correct current state (must be soft-deleted first).
+
+### Bug Fixes
+- None.
+
+## Technical Flow
+1. Cashier deletes a payment → soft-deleted, disappears from dashboard/stats, appears in Recently Deleted → Restore brings it back into active stats, or Permanently Delete removes it for good.
+2. Instructor cancels a request → soft-deleted (was previously a hard delete) → appears in their Recently Deleted → Restore sets it back to PENDING status.
+
+## Files Created
+- client/src/pages/cashier/CashierRecentlyDeleted.jsx
+- client/src/pages/instructor/InstructorRecentlyDeleted.jsx
+
+## Files Modified
+- client/src/pages/cashier/CashierDashboard.jsx
+- client/src/layouts/DashboardLayout.jsx
+- client/src/App.jsx
+- client/src/services/paymentApi.js
+- client/src/services/scheduleRequestApi.js
+- server/src/services/payment.service.js
+- server/src/controllers/payment.controller.js
+- server/src/routes/payment.routes.js
+- server/src/routes/scheduleRequest.routes.js
+- server/prisma/schema.prisma
+
+## Database Changes
+- Added `Payment.isDeleted`, `Payment.deletedAt`
+- Added `ScheduleRequest.isDeleted`, `ScheduleRequest.deletedAt`
+
+## API Endpoints
+- DELETE /api/payments/:id
+- PATCH /api/payments/:id/restore
+- DELETE /api/payments/:id/permanent
+- GET /api/payments/recently-deleted
+- GET /api/schedule-requests/mine/recently-deleted
+- PATCH /api/schedule-requests/:id/restore
+- DELETE /api/schedule-requests/:id/permanent
+
+## Testing Checklist
+- [x] Payment soft-delete/restore/permanent-delete cycle verified end-to-end
+- [x] Schedule request cancel/restore cycle verified, restore correctly returns status to PENDING
+- [x] Deleted items excluded from normal lists and stats; only appear in Recently Deleted
+- [x] Cross-role 403s confirmed (Instructor can't see Cashier's deleted payments and vice versa)
+
+## Notes
+- None.
+
+============================================================
+Feature: In-App Notification System
+============================================================
+
+## Feature Summary
+Added a real notification bell with a `Notification` model backing it — not just UI. Wired into the Schedule Request lifecycle: instructor submits a request → all Admin/Registrar accounts get notified; Admin/Registrar approves/rejects → the requesting instructor gets notified, including the reviewer's reason on rejection.
+
+## Changes Made
+### Frontend
+- New `NotificationBell.jsx` — badge-counted bell in the header, polls unread count every 30s, popover lists recent notifications, click marks read + navigates to the relevant page, "Mark all read" action.
+- `DashboardLayout.jsx` — bell added to the AppBar next to the user avatar.
+- New `notificationApi.js` service wrapper.
+
+### Backend
+- New `notification.service.js` — single/fan-out create (by user IDs or by role names), list, unread count, mark-read, mark-all-read.
+- New `notification.routes.js` — mounted at `/api/notifications`, available to any authenticated role (not role-restricted, since notifications are per-user).
+- `scheduleRequest.routes.js` — notification triggers added on submit (fan-out to ADMINISTRATOR + REGISTRAR_SCHEDULER), approve, and reject (both to the requesting instructor).
+
+### Database
+- Added `Notification` model (userId, title, message, type, link, isRead, createdAt).
+
+### API
+- New: `GET /api/notifications/mine`, `GET /api/notifications/unread-count`, `PATCH /api/notifications/:id/read`, `PATCH /api/notifications/read-all`
+
+### Validation
+- `markRead` verifies the notification belongs to the requesting user before updating.
+
+### Bug Fixes
+- None.
+
+## Technical Flow
+1. Instructor submits a schedule request → `NotificationService.createForRoles(['ADMINISTRATOR','REGISTRAR_SCHEDULER'], ...)` fans out a notification to every Admin/Registrar account.
+2. Admin/Registrar approves or rejects → `NotificationService.create(instructorUserId, ...)` notifies the instructor, with the reviewer's `reviewNotes` included in the message on rejection.
+3. `NotificationBell` polls `/api/notifications/unread-count` every 30s and fetches the full list when opened; clicking an item marks it read and navigates via its `link`.
+
+## Files Created
+- client/src/components/NotificationBell.jsx
+- client/src/services/notificationApi.js
+- server/src/services/notification.service.js
+- server/src/routes/notification.routes.js
+
+## Files Modified
+- client/src/layouts/DashboardLayout.jsx
+- server/src/app.js
+- server/src/routes/scheduleRequest.routes.js
+- server/prisma/schema.prisma
+
+## Database Changes
+- Added `Notification` table
+
+## API Endpoints
+- GET /api/notifications/mine
+- GET /api/notifications/unread-count
+- PATCH /api/notifications/:id/read
+- PATCH /api/notifications/read-all
+
+## Testing Checklist
+- [x] Submitting a request notifies both Admin and Registrar with correct message content
+- [x] Approving/rejecting notifies the instructor with correct message content (including reject reason)
+- [x] Mark-single-read and mark-all-read both correctly zero the unread count
+
+## Notes
+- Extended beyond the original ask (instructor notified on approval) to include the submission-side notification to reviewers, since it's the natural other half of the same loop.
+
+============================================================
+Git Commit
+============================================================
+
+2026-07-08 - Add Settings, Cashier/Registrar dashboards, Timmy AI recommendations (scheduling/payments/instructor insights), real Instructor availability & schedule-request workflow, Recently Deleted for all roles, and an in-app notification system
+
+============================================================

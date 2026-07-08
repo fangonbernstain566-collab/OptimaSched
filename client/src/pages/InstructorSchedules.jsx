@@ -3,32 +3,52 @@ import axios from 'axios';
 import {
   Box, Typography, Paper, Tab, Tabs, CircularProgress, Button, Modal, Stack,
   TextField, Select, MenuItem, Divider, Card, CardContent, Chip, Alert, IconButton,
+  FormControl, InputLabel,
 } from '@mui/material';
 import {
   Add as AddIcon,
   Close as CloseIcon,
   Delete as DeleteIcon,
 } from '@mui/icons-material';
-import { useAuth } from '../context/AuthContext';
 import { useToast } from '../hooks/useToast';
 import Toast from '../components/Toast';
+import { getMyRequests, createRequest, cancelRequest } from '../services/scheduleRequestApi';
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 const TIME_SLOTS = ['07:30', '09:00', '10:30', '12:00', '13:30', '15:00', '16:30'];
 
+const REQUEST_STATUS_COLOR = { PENDING: 'warning', APPROVED: 'success', REJECTED: 'error' };
+
+const addMinutes = (time, mins) => {
+  const [h, m] = time.split(':').map(Number);
+  const total = h * 60 + m + mins;
+  return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
+};
+
+const formatTime = (time) => {
+  if (!time) return time;
+  const [h, m] = time.split(':').map(Number);
+  const period = h >= 12 ? 'PM' : 'AM';
+  const hour12 = h % 12 === 0 ? 12 : h % 12;
+  return `${hour12}:${String(m).padStart(2, '0')} ${period}`;
+};
+
 export default function InstructorSchedules() {
-  const { user } = useAuth();
   const { toast, showToast, hideToast } = useToast();
 
   const [schedules, setSchedules] = useState([]);
   const [rooms, setRooms] = useState([]);
+  const [subjectOfferings, setSubjectOfferings] = useState([]);
+  const [sections, setSections] = useState([]);
+  const [myRequests, setMyRequests] = useState([]);
   const [selectedDay, setSelectedDay] = useState('Monday');
   const [loading, setLoading] = useState(false);
   const [requestOpen, setRequestOpen] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState(null);
   const [formData, setFormData] = useState({
-    subjectName: '',
-    room: '',
+    subjectOfferingId: '',
+    sectionId: '',
+    roomId: '',
     studentCount: '',
     notes: '',
   });
@@ -42,13 +62,18 @@ export default function InstructorSchedules() {
     setLoading(true);
     try {
       const config = getAuthHeaders();
-      const [resSched, resRooms] = await Promise.all([
+      const [resSched, resRooms, resOptions, resRequests] = await Promise.all([
         axios.get('/api/schedules', config),
         axios.get('/api/rooms', config),
+        axios.get('/api/schedules/options', config),
+        getMyRequests(),
       ]);
 
       setSchedules(resSched.data?.data ?? []);
       setRooms(resRooms.data?.data ?? []);
+      setSubjectOfferings(resOptions.data?.data?.subjectOfferings ?? []);
+      setSections(resOptions.data?.data?.sections ?? []);
+      setMyRequests(resRequests);
     } catch (err) {
       console.error('Failed to load data:', err);
       showToast('Failed to load schedule data.', 'error');
@@ -59,7 +84,7 @@ export default function InstructorSchedules() {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const isSlotOccupied = (day, timeSlot) => {
     return schedules.some(
@@ -80,53 +105,41 @@ export default function InstructorSchedules() {
   };
 
   const handleSubmitRequest = async () => {
-    if (!formData.subjectName || !formData.studentCount) {
+    if (!formData.subjectOfferingId || !formData.sectionId || !formData.studentCount) {
       showToast('Please fill in all required fields.', 'error');
       return;
     }
 
     try {
       const endTime = addMinutes(selectedSlot.timeSlot, 90);
-      const requests = JSON.parse(localStorage.getItem('schedule_requests') || '[]');
-      const newRequest = {
-        id: Date.now(),
-        subject: formData.subjectName,
+      await createRequest({
+        subjectOfferingId: formData.subjectOfferingId,
+        sectionId: formData.sectionId,
+        roomId: formData.roomId || undefined,
         dayOfWeek: selectedSlot.day,
         startTime: selectedSlot.timeSlot,
         endTime,
-        room: formData.room,
-        studentCount: parseInt(formData.studentCount),
+        studentCount: parseInt(formData.studentCount, 10),
         notes: formData.notes,
-        status: 'PENDING',
-        submittedAt: new Date().toISOString(),
-      };
-      requests.push(newRequest);
-      localStorage.setItem('schedule_requests', JSON.stringify(requests));
+      });
 
       showToast('Schedule request submitted successfully!', 'success');
       setRequestOpen(false);
       setSelectedSlot(null);
-      setFormData({ subjectName: '', room: '', studentCount: '', notes: '' });
+      setFormData({ subjectOfferingId: '', sectionId: '', roomId: '', studentCount: '', notes: '' });
+      fetchData();
     } catch (err) {
-      showToast('Failed to submit request.', 'error');
+      showToast(err.response?.data?.message ?? 'Failed to submit request.', 'error');
     }
   };
 
-  const addMinutes = (time, mins) => {
-    const [h, m] = time.split(':').map(Number);
-    const total = h * 60 + m + mins;
-    return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
-  };
-
-  const handleCancelRequest = (requestId) => {
+  const handleCancelRequest = async (requestId) => {
     try {
-      const requests = JSON.parse(localStorage.getItem('schedule_requests') || '[]');
-      const filteredRequests = requests.filter((r) => r.id !== requestId);
-      localStorage.setItem('schedule_requests', JSON.stringify(filteredRequests));
+      await cancelRequest(requestId);
       showToast('Schedule request cancelled successfully.', 'success');
       fetchData();
     } catch (err) {
-      showToast('Failed to cancel request.', 'error');
+      showToast(err.response?.data?.message ?? 'Failed to cancel request.', 'error');
     }
   };
 
@@ -137,8 +150,6 @@ export default function InstructorSchedules() {
       </Box>
     );
   }
-
-  const savedRequests = JSON.parse(localStorage.getItem('schedule_requests') || '[]');
 
   return (
     <Box sx={{ p: 4, minHeight: '100vh', bgcolor: '#f8fafc', mt: -4, mx: -4 }}>
@@ -262,22 +273,25 @@ export default function InstructorSchedules() {
         Your Schedule Requests
       </Typography>
 
-      {savedRequests.length > 0 ? (
+      {myRequests.length > 0 ? (
         <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 2, mb: 4 }}>
-          {savedRequests.map((request) => (
+          {myRequests.map((request) => (
             <Card key={request.id}>
               <CardContent>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', mb: 1 }}>
                   <Box sx={{ flex: 1 }}>
                     <Typography variant="subtitle1" fontWeight="bold">
-                      {request.subject}
+                      {request.subjectOffering?.subject?.name ?? 'Unknown Subject'}
                     </Typography>
                     <Typography variant="body2" color="textSecondary">
-                      {request.dayOfWeek} • {request.startTime} - {request.endTime}
+                      {request.dayOfWeek} • {formatTime(request.startTime)} - {formatTime(request.endTime)}
+                    </Typography>
+                    <Typography variant="body2" color="textSecondary">
+                      Section: {request.section?.name ?? '—'}
                     </Typography>
                     {request.room && (
                       <Typography variant="body2" color="textSecondary">
-                        Room: {request.room}
+                        Room: {request.room.name}
                       </Typography>
                     )}
                     <Typography variant="body2" color="textSecondary">
@@ -288,25 +302,30 @@ export default function InstructorSchedules() {
                         {request.notes}
                       </Typography>
                     )}
+                    {request.status === 'REJECTED' && request.reviewNotes && (
+                      <Alert severity="error" sx={{ mt: 1, py: 0 }}>{request.reviewNotes}</Alert>
+                    )}
                   </Box>
                   <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, alignItems: 'flex-end' }}>
                     <Chip
                       label={request.status}
                       size="small"
-                      color={request.status === 'APPROVED' ? 'success' : 'warning'}
+                      color={REQUEST_STATUS_COLOR[request.status]}
                       variant="outlined"
                     />
-                    <IconButton
-                      size="small"
-                      onClick={() => handleCancelRequest(request.id)}
-                      sx={{
-                        color: '#dc2626',
-                        '&:hover': { backgroundColor: 'rgba(220, 38, 38, 0.1)' },
-                      }}
-                      title="Cancel request"
-                    >
-                      <DeleteIcon fontSize="small" />
-                    </IconButton>
+                    {request.status === 'PENDING' && (
+                      <IconButton
+                        size="small"
+                        onClick={() => handleCancelRequest(request.id)}
+                        sx={{
+                          color: '#dc2626',
+                          '&:hover': { backgroundColor: 'rgba(220, 38, 38, 0.1)' },
+                        }}
+                        title="Cancel request"
+                      >
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    )}
                   </Box>
                 </Box>
               </CardContent>
@@ -353,27 +372,47 @@ export default function InstructorSchedules() {
           )}
 
           <Stack spacing={2}>
-            <TextField
-              label="Subject/Course Name"
-              fullWidth
-              value={formData.subjectName}
-              onChange={(e) => setFormData({ ...formData, subjectName: e.target.value })}
-              required
-            />
+            <FormControl fullWidth required>
+              <InputLabel>Subject / Class</InputLabel>
+              <Select
+                label="Subject / Class"
+                value={formData.subjectOfferingId}
+                onChange={(e) => setFormData({ ...formData, subjectOfferingId: e.target.value })}
+              >
+                {subjectOfferings.map((o) => (
+                  <MenuItem key={o.id} value={o.id}>{o.classCode} — {o.subject?.name}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
 
-            <Select
-              label="Preferred Room"
-              value={formData.room}
-              onChange={(e) => setFormData({ ...formData, room: e.target.value })}
-              fullWidth
-            >
-              <MenuItem value="">No Preference</MenuItem>
-              {rooms.map((room) => (
-                <MenuItem key={room.id} value={room.name}>
-                  {room.name} (Cap: {room.capacity})
-                </MenuItem>
-              ))}
-            </Select>
+            <FormControl fullWidth required>
+              <InputLabel>Section</InputLabel>
+              <Select
+                label="Section"
+                value={formData.sectionId}
+                onChange={(e) => setFormData({ ...formData, sectionId: e.target.value })}
+              >
+                {sections.map((s) => (
+                  <MenuItem key={s.id} value={s.id}>{s.name}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+
+            <FormControl fullWidth>
+              <InputLabel>Preferred Room</InputLabel>
+              <Select
+                label="Preferred Room"
+                value={formData.roomId}
+                onChange={(e) => setFormData({ ...formData, roomId: e.target.value })}
+              >
+                <MenuItem value="">No Preference</MenuItem>
+                {rooms.map((room) => (
+                  <MenuItem key={room.id} value={room.id}>
+                    {room.name} (Cap: {room.capacity})
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
 
             <TextField
               label="Expected Student Count"

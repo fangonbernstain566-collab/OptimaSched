@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import {
   DndContext, DragOverlay, useDraggable, useDroppable,
@@ -8,20 +8,34 @@ import { CSS } from '@dnd-kit/utilities';
 import {
   Box, Typography, Paper, Chip, Tab, Tabs,
   CircularProgress, Button, Modal, Stack, Divider,
-  Tooltip,
+  Tooltip, IconButton, GlobalStyles,
 } from '@mui/material';
 import {
   DragIndicator as DragIcon,
   Person as PersonIcon,
   Group as GroupIcon,
+  AutoAwesome as TimmyIcon,
+  ChevronLeft,
+  ChevronRight,
+  Close as CloseIcon,
+  CheckCircle as CheckIcon,
+  MeetingRoom as RoomIcon,
 } from '@mui/icons-material';
 import { useToast } from '../hooks/useToast';
 import Toast from '../components/Toast';
+import { getTimmyRecommendations } from '../services/timmyApi';
 
 const DAYS       = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 const SLOT_MINUTES = 30;
 const GRID_START = '07:30';
 const GRID_END   = '18:00';
+
+// Visual language for Timmy's top-3, ranked by prominence.
+const RANK_STYLES = {
+  1: { label: '#1 Best Match',  bg: '#fffbeb', border: '#f59e0b', solid: '#f59e0b', text: '#92400e' },
+  2: { label: '#2 Runner-up',   bg: '#f8fafc', border: '#94a3b8', solid: '#94a3b8', text: '#334155' },
+  3: { label: '#3 Alternative', bg: '#fdf2f8', border: '#db9dc7', solid: '#c2679f', text: '#831843' },
+};
 
 const toMinutes = (time) => {
   const [h, m] = time.split(':').map(Number);
@@ -74,6 +88,33 @@ const getRoomOccupancy = (slots, roomId, day) => {
   return bySlotIndex;
 };
 
+// Same idea as getRoomOccupancy, but for Timmy's proposed (not-yet-real) slots
+// on a given room/day — used to render the highlight overlay on the grid.
+const getRoomRecommendations = (recommendations, roomId, day) => {
+  const bySlotIndex = new Map();
+  (recommendations ?? [])
+    .filter((r) => r.roomId === roomId && r.day === day)
+    .forEach((rec) => {
+      const startIdx = TIME_SLOTS.indexOf(rec.startTime);
+      if (startIdx === -1) return;
+      const mins = toMinutes(rec.endTime) - toMinutes(rec.startTime);
+      const span = Math.min(Math.max(1, Math.round(mins / SLOT_MINUTES)), TIME_SLOTS.length - startIdx);
+      bySlotIndex.set(startIdx, { rec, span });
+    });
+  return bySlotIndex;
+};
+
+const recKey = (rec) => `${rec.roomId}||${rec.startTime}||${rec.day}`;
+
+// Composes dnd-kit's callback ref with our own, so a single DOM node can be
+// tracked by both the droppable sensor and Timmy's "scroll into view" logic.
+const mergeRefs = (...refs) => (node) => {
+  refs.forEach((ref) => {
+    if (typeof ref === 'function') ref(node);
+    else if (ref) ref.current = node;
+  });
+};
+
 const buildTooltip = (occupant) => {
   if (!occupant) return '';
 
@@ -101,7 +142,7 @@ const buildTooltip = (occupant) => {
   );
 };
 
-const PendingCard = ({ schedule }) => {
+const PendingCard = ({ schedule, onAskTimmy, timmyLoading, isActive }) => {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: schedule.id,
     data: schedule,
@@ -116,7 +157,7 @@ const PendingCard = ({ schedule }) => {
       sx={{
         p: 2, mb: 1.5, borderRadius: '12px',
         border: '2px solid',
-        borderColor: isDragging ? '#2563eb' : '#e2e8f0',
+        borderColor: isActive ? '#6d28d9' : isDragging ? '#2563eb' : '#e2e8f0',
         opacity: isDragging ? 0.35 : 1,
         cursor: 'grab', userSelect: 'none',
         transform: CSS.Translate.toString(transform),
@@ -140,17 +181,38 @@ const PendingCard = ({ schedule }) => {
         </Typography>
       </Box>
 
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 1 }}>
         <GroupIcon sx={{ fontSize: 13, color: '#64748b' }} />
         <Typography variant="caption" color="text.secondary">
           {schedule.studentCount ?? 0} students · {schedule.section?.name ?? '—'}
         </Typography>
       </Box>
+
+      <Button
+        fullWidth
+        size="small"
+        startIcon={<TimmyIcon sx={{ fontSize: 15 }} />}
+        disabled={timmyLoading}
+        // Prevent dnd-kit's pointer sensor (bound on the card root) from
+        // swallowing this click as the start of a drag gesture.
+        onPointerDown={(e) => e.stopPropagation()}
+        onClick={(e) => { e.stopPropagation(); onAskTimmy(schedule); }}
+        sx={{
+          bgcolor: isActive ? '#ede9fe' : '#f5f3ff', color: '#6d28d9', textTransform: 'none',
+          fontWeight: 700, fontSize: '0.7rem', borderRadius: '8px',
+          '&:hover': { bgcolor: '#ede9fe' },
+        }}
+      >
+        {timmyLoading ? 'Asking Timmy…' : isActive ? 'Timmy is assisting…' : 'Ask Timmy'}
+      </Button>
     </Paper>
   );
 };
 
-const PlotterCell = ({ id, roomId, timeSlot, day, room, isOccupied, occupant, span = 1, gridColumn, gridRow, draggingCount }) => {
+const PlotterCell = ({
+  id, roomId, timeSlot, day, room, isOccupied, occupant, span = 1, gridColumn, gridRow,
+  draggingCount, recommendation, isSelected, onSelectRecommendation, onApplyRecommendation, registerRef,
+}) => {
   const { setNodeRef, isOver } = useDroppable({
     id,
     data: { roomId, timeSlot, day, room },
@@ -158,9 +220,12 @@ const PlotterCell = ({ id, roomId, timeSlot, day, room, isOccupied, occupant, sp
   });
 
   const capacityOk = draggingCount !== null ? room.capacity >= draggingCount : true;
+  const rankStyle = recommendation ? RANK_STYLES[recommendation.rank] : null;
 
   const bg = isOccupied
     ? '#fee2e2'
+    : rankStyle
+    ? rankStyle.bg
     : isOver && capacityOk
     ? '#dcfce7'
     : isOver && !capacityOk
@@ -169,6 +234,8 @@ const PlotterCell = ({ id, roomId, timeSlot, day, room, isOccupied, occupant, sp
 
   const borderColor = isOccupied
     ? '#fca5a5'
+    : rankStyle
+    ? rankStyle.border
     : isOver && capacityOk
     ? '#86efac'
     : isOver && !capacityOk
@@ -177,15 +244,20 @@ const PlotterCell = ({ id, roomId, timeSlot, day, room, isOccupied, occupant, sp
 
   const cellContent = (
     <Box
-      ref={setNodeRef}
+      ref={mergeRefs(setNodeRef, registerRef)}
+      onClick={() => { if (recommendation) onSelectRecommendation?.(recommendation.rec); }}
       sx={{
         gridColumn, gridRow,
         minHeight: 56, borderRadius: '8px',
-        border: '2px dashed', borderColor,
+        border: rankStyle ? '2px solid' : '2px dashed',
+        borderColor,
         bgcolor: bg, display: 'flex',
         alignItems: 'center', justifyContent: 'center',
         transition: 'all .15s ease', p: 0.75,
-        cursor: isOccupied ? 'pointer' : 'default',
+        position: 'relative',
+        cursor: isOccupied ? 'pointer' : recommendation ? 'pointer' : 'default',
+        boxShadow: recommendation?.rank === 1 ? `0 0 0 2px ${rankStyle.border}55` : 'none',
+        animation: isSelected ? 'timmyPulse 1.1s ease-in-out 2' : 'none',
       }}
     >
       {isOccupied ? (
@@ -197,6 +269,33 @@ const PlotterCell = ({ id, roomId, timeSlot, day, room, isOccupied, occupant, sp
             <Typography variant="caption" color="error.main" display="block" sx={{ opacity: 0.75, fontSize: '0.65rem' }} noWrap>
               {formatTime(occupant?.startTime)} – {formatTime(occupant?.endTime)}
             </Typography>
+          )}
+        </Box>
+      ) : recommendation ? (
+        <Box sx={{ textAlign: 'center', width: '100%' }}>
+          <Chip
+            label={`#${recommendation.rank}`}
+            size="small"
+            sx={{
+              height: 16, fontSize: '0.6rem', fontWeight: 800, mb: 0.25,
+              bgcolor: rankStyle.solid, color: '#fff',
+            }}
+          />
+          <Typography variant="caption" fontWeight="700" display="block" noWrap sx={{ color: rankStyle.text, fontSize: '0.65rem' }}>
+            {span > 1 ? `${formatTime(timeSlot)}–${formatTime(addMinutes(timeSlot, span * SLOT_MINUTES))}` : 'Suggested'}
+          </Typography>
+          {isSelected && (
+            <Button
+              size="small"
+              onClick={(e) => { e.stopPropagation(); onApplyRecommendation?.(recommendation.rec); }}
+              sx={{
+                mt: 0.25, py: 0, minHeight: 20, fontSize: '0.6rem', fontWeight: 800,
+                textTransform: 'none', bgcolor: rankStyle.solid, color: '#fff', borderRadius: '6px',
+                '&:hover': { bgcolor: rankStyle.solid, opacity: 0.85 },
+              }}
+            >
+              Apply
+            </Button>
           )}
         </Box>
       ) : isOver ? (
@@ -240,6 +339,16 @@ const SchedulePlotter = () => {
   const [activeSched, setActiveSched] = useState(null);
   const [loading, setLoading]         = useState(false);
   const [confirm, setConfirm]         = useState(null);
+
+  // { schedule, blocked, reason, recommendations } — populated by "Ask Timmy".
+  // The Schedule Plotter never unmounts while this is open; it drives an
+  // inline side panel + highlight overlay instead of navigating away.
+  const [timmyResult, setTimmyResult]     = useState(null);
+  const [timmyLoadingId, setTimmyLoadingId] = useState(null);
+  const [timmyCollapsed, setTimmyCollapsed] = useState(false);
+  const [selectedRecKey, setSelectedRecKey] = useState(null);
+
+  const cellRefs = useRef({});
 
   const { toast, showToast, hideToast } = useToast();
 
@@ -309,6 +418,62 @@ const SchedulePlotter = () => {
     });
   };
 
+  const handleAskTimmy = async (schedule) => {
+    setTimmyLoadingId(schedule.id);
+    try {
+      const result = await getTimmyRecommendations(schedule.id);
+      setTimmyResult({ schedule, ...result });
+      setTimmyCollapsed(false);
+
+      const top = result?.recommendations?.[0];
+      if (top) {
+        setSelectedDay(top.day);
+        setSelectedRecKey(recKey(top));
+      } else {
+        setSelectedRecKey(null);
+      }
+    } catch (err) {
+      showToast(err.response?.data?.message ?? 'Timmy could not generate recommendations.', 'error');
+    } finally {
+      setTimmyLoadingId(null);
+    }
+  };
+
+  // Clicking a recommendation (card or highlighted cell) locates it: switch
+  // to its day if needed, then scroll + pulse once the grid re-renders.
+  const handleSelectRecommendation = (rec) => {
+    setSelectedRecKey(recKey(rec));
+    if (rec.day !== selectedDay) setSelectedDay(rec.day);
+  };
+
+  useEffect(() => {
+    if (!selectedRecKey) return;
+    const node = cellRefs.current[selectedRecKey];
+    if (node) {
+      node.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+    }
+  }, [selectedRecKey, selectedDay]);
+
+  const closeTimmyPanel = () => {
+    setTimmyResult(null);
+    setSelectedRecKey(null);
+  };
+
+  // Reuses the same confirm-and-place flow as a manual drag: Timmy only
+  // proposes a slot, it never writes to the schedule itself. The Confirm
+  // Placement modal is the actual "are you sure" gate before anything saves.
+  const handleApplyRecommendation = (rec) => {
+    setConfirm({
+      schedule:     timmyResult.schedule,
+      roomId:       rec.roomId,
+      roomName:     rec.roomName,
+      roomCapacity: rec.roomCapacity,
+      timeSlot:     rec.startTime,
+      endTime:      rec.endTime,
+      day:          rec.day,
+    });
+  };
+
   const handleConfirm = async () => {
     if (!confirm) return;
     try {
@@ -332,17 +497,29 @@ const SchedulePlotter = () => {
       );
       showToast('Schedule placed successfully! 🎉', 'success');
       setConfirm(null);
+      closeTimmyPanel();
       fetchData();
     } catch (err) {
       showToast(err.response?.data?.message ?? 'Failed to place schedule.', 'error');
     }
   };
 
+  const recommendations = timmyResult?.recommendations ?? [];
+
   return (
     <Box sx={{ p: 4, minHeight: '100vh', bgcolor: '#f8fafc', mt: -4 }}>
+      <GlobalStyles
+        styles={{
+          '@keyframes timmyPulse': {
+            '0%':   { boxShadow: '0 0 0 0 rgba(109,40,217,0.55)' },
+            '70%':  { boxShadow: '0 0 0 10px rgba(109,40,217,0)' },
+            '100%': { boxShadow: '0 0 0 0 rgba(109,40,217,0)' },
+          },
+        }}
+      />
       <Toast toast={toast} onClose={hideToast} />
 
-      <Box sx={{ maxWidth: '1500px', mx: 'auto' }}>
+      <Box sx={{ maxWidth: '1700px', mx: 'auto' }}>
 
         <Box sx={{ mb: 4 }}>
           <Typography variant="h4" fontWeight="800" sx={{ color: '#1e293b' }}>
@@ -390,7 +567,15 @@ const SchedulePlotter = () => {
                       </Typography>
                     </Box>
                   ) : (
-                    pending.map((s) => <PendingCard key={s.id} schedule={s} />)
+                    pending.map((s) => (
+                      <PendingCard
+                        key={s.id}
+                        schedule={s}
+                        onAskTimmy={handleAskTimmy}
+                        timmyLoading={timmyLoadingId === s.id}
+                        isActive={timmyResult?.schedule?.id === s.id}
+                      />
+                    ))
                   )}
                 </Paper>
 
@@ -409,6 +594,20 @@ const SchedulePlotter = () => {
                       <Typography variant="caption">{label}</Typography>
                     </Box>
                   ))}
+                  {timmyResult && (
+                    <>
+                      <Divider sx={{ my: 1.25 }} />
+                      <Typography variant="caption" fontWeight="700" display="block" sx={{ mb: 0.75, color: '#6d28d9' }}>
+                        Timmy's picks
+                      </Typography>
+                      {Object.entries(RANK_STYLES).map(([rank, s]) => (
+                        <Box key={rank} sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.75 }}>
+                          <Box sx={{ width: 18, height: 18, borderRadius: '4px', flexShrink: 0, bgcolor: s.bg, border: `2px solid ${s.border}` }} />
+                          <Typography variant="caption">{s.label}</Typography>
+                        </Box>
+                      ))}
+                    </>
+                  )}
                 </Paper>
               </Box>
 
@@ -423,12 +622,21 @@ const SchedulePlotter = () => {
                   >
                     {DAYS.map((d) => {
                       const count = scheduled.filter((s) => s.dayOfWeek === d).length;
+                      const recCount = recommendations.filter((r) => r.day === d).length;
                       return (
                         <Tab
                           key={d} value={d}
                           label={
-                            <Box sx={{ textAlign: 'center' }}>
-                              <Typography variant="body2" fontWeight="700">{d}</Typography>
+                            <Box sx={{ textAlign: 'center', position: 'relative' }}>
+                              <Typography variant="body2" fontWeight="700">
+                                {d}
+                                {recCount > 0 && (
+                                  <Box component="span" sx={{
+                                    ml: 0.5, display: 'inline-block', width: 6, height: 6,
+                                    borderRadius: '50%', bgcolor: '#f59e0b',
+                                  }} />
+                                )}
+                              </Typography>
                               {count > 0 && (
                                 <Typography variant="caption" color="text.secondary">
                                   {count} scheduled
@@ -466,13 +674,19 @@ const SchedulePlotter = () => {
 
                       {rooms.map((room, roomIndex) => {
                         const occupancyByStart = getRoomOccupancy(scheduled, room.id, selectedDay);
+                        const recByStart = getRoomRecommendations(recommendations, room.id, selectedDay);
                         const gridRow = roomIndex + 2; // row 1 is the time-slot header
 
                         // Slot indices already covered by an earlier, spanning block
-                        // must be skipped entirely — not rendered empty — otherwise
-                        // the grid's auto row-placement would shift later rooms.
+                        // (real occupancy OR a multi-slot recommendation) must be
+                        // skipped entirely — not rendered empty — otherwise the
+                        // grid's explicit placement would double up columns.
                         const coveredIndices = new Set();
                         occupancyByStart.forEach(({ span }, startIdx) => {
+                          for (let i = 1; i < span; i += 1) coveredIndices.add(startIdx + i);
+                        });
+                        recByStart.forEach(({ span }, startIdx) => {
+                          if (occupancyByStart.has(startIdx)) return; // real booking wins
                           for (let i = 1; i < span; i += 1) coveredIndices.add(startIdx + i);
                         });
 
@@ -507,13 +721,18 @@ const SchedulePlotter = () => {
                               if (coveredIndices.has(slotIndex)) return null;
 
                               const occupied = occupancyByStart.get(slotIndex);
+                              const recommended = !occupied ? recByStart.get(slotIndex) : null;
                               const colStart = slotIndex + 2; // column 1 is the room label
-                              const span = occupied?.span ?? 1;
+                              const span = occupied?.span ?? recommended?.span ?? 1;
+                              const cellId = `${room.id}||${timeSlot}||${selectedDay}`;
+                              const recommendation = recommended
+                                ? { rec: recommended.rec, rank: recommended.rec.rank }
+                                : null;
 
                               return (
                                 <PlotterCell
                                   key={`${room.id}||${timeSlot}`}
-                                  id={`${room.id}||${timeSlot}||${selectedDay}`}
+                                  id={cellId}
                                   roomId={room.id}
                                   timeSlot={timeSlot}
                                   day={selectedDay}
@@ -524,6 +743,14 @@ const SchedulePlotter = () => {
                                   gridColumn={`${colStart} / span ${span}`}
                                   gridRow={gridRow}
                                   draggingCount={activeSched?.studentCount ?? null}
+                                  recommendation={recommendation}
+                                  isSelected={!!recommendation && selectedRecKey === recKey(recommendation.rec)}
+                                  onSelectRecommendation={handleSelectRecommendation}
+                                  onApplyRecommendation={handleApplyRecommendation}
+                                  registerRef={(node) => {
+                                    if (node) cellRefs.current[cellId] = node;
+                                    else delete cellRefs.current[cellId];
+                                  }}
                                 />
                               );
                             })}
@@ -537,6 +764,129 @@ const SchedulePlotter = () => {
                 </Paper>
 
               </Box>
+
+              {/* ── Timmy side panel — stays open alongside the plotter ─────── */}
+              {timmyResult && (
+                <Box sx={{ width: timmyCollapsed ? 56 : 320, flexShrink: 0, position: 'sticky', top: 24, transition: 'width .2s ease' }}>
+                  <Paper sx={{ borderRadius: '16px', overflow: 'hidden', maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
+                    <Box sx={{
+                      display: 'flex', alignItems: 'center', gap: 1, p: timmyCollapsed ? 1 : 2,
+                      bgcolor: '#6d28d9', color: '#fff',
+                    }}>
+                      <TimmyIcon fontSize="small" />
+                      {!timmyCollapsed && (
+                        <Typography variant="subtitle2" fontWeight="800" sx={{ flex: 1 }}>
+                          Timmy
+                        </Typography>
+                      )}
+                      <IconButton
+                        size="small"
+                        onClick={() => setTimmyCollapsed((c) => !c)}
+                        sx={{ color: '#fff' }}
+                        title={timmyCollapsed ? 'Expand' : 'Collapse'}
+                      >
+                        {timmyCollapsed ? <ChevronLeft fontSize="small" /> : <ChevronRight fontSize="small" />}
+                      </IconButton>
+                      {!timmyCollapsed && (
+                        <IconButton size="small" onClick={closeTimmyPanel} sx={{ color: '#fff' }} title="Close">
+                          <CloseIcon fontSize="small" />
+                        </IconButton>
+                      )}
+                    </Box>
+
+                    {!timmyCollapsed && (
+                      <Box sx={{ p: 2, overflowY: 'auto' }}>
+                        <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 2 }}>
+                          Recommending for <strong>{timmyResult.schedule?.subjectOffering?.subject?.name ?? 'this class'}</strong>
+                        </Typography>
+
+                        {timmyResult.blocked && (
+                          <Typography variant="body2" sx={{ p: 1.5, bgcolor: '#fef2f2', color: '#b91c1c', borderRadius: '10px' }}>
+                            {timmyResult.reason}
+                          </Typography>
+                        )}
+
+                        {!timmyResult.blocked && recommendations.length === 0 && (
+                          <Typography variant="body2" sx={{ p: 1.5, bgcolor: '#fffbeb', color: '#92400e', borderRadius: '10px' }}>
+                            {timmyResult.reason ?? 'No conflict-free room/time combination was found.'}
+                          </Typography>
+                        )}
+
+                        {!timmyResult.blocked && (
+                          <Stack spacing={1.5}>
+                            {recommendations.map((rec) => {
+                              const style = RANK_STYLES[rec.rank];
+                              const isSel = selectedRecKey === recKey(rec);
+                              return (
+                                <Paper
+                                  key={recKey(rec)}
+                                  variant="outlined"
+                                  onClick={() => handleSelectRecommendation(rec)}
+                                  sx={{
+                                    p: 1.75, borderRadius: '12px', cursor: 'pointer',
+                                    borderColor: isSel ? style.solid : style.border,
+                                    borderWidth: isSel ? 2 : 1,
+                                    bgcolor: isSel ? style.bg : 'transparent',
+                                    transition: 'all .15s ease',
+                                  }}
+                                >
+                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.75 }}>
+                                    <Chip
+                                      label={style.label}
+                                      size="small"
+                                      sx={{ bgcolor: style.solid, color: '#fff', fontWeight: 700, fontSize: '0.65rem' }}
+                                    />
+                                  </Box>
+
+                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
+                                    <RoomIcon sx={{ fontSize: 14, color: '#64748b' }} />
+                                    <Typography variant="body2" fontWeight="700">{rec.roomName}</Typography>
+                                  </Box>
+                                  <Typography variant="caption" color="text.secondary" display="block">
+                                    {rec.day} · {formatTime(rec.startTime)} – {formatTime(rec.endTime)}
+                                  </Typography>
+
+                                  <Divider sx={{ my: 1 }} />
+
+                                  <Stack spacing={0.4} sx={{ mb: 1 }}>
+                                    <Typography variant="caption" display="block">
+                                      <strong>Score:</strong> {rec.score}
+                                    </Typography>
+                                    <Typography variant="caption" display="block">
+                                      <strong>Capacity:</strong> {rec.capacityMatch}
+                                    </Typography>
+                                    <Typography variant="caption" display="block">
+                                      <strong>Equipment:</strong> {rec.equipmentMatch}
+                                    </Typography>
+                                    <Typography variant="caption" display="block" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                      <CheckIcon sx={{ fontSize: 12, color: '#16a34a' }} /> {rec.conflictStatus}
+                                    </Typography>
+                                    <Typography variant="caption" display="block">
+                                      <strong>Availability:</strong> {rec.availability}
+                                    </Typography>
+                                  </Stack>
+
+                                  <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1, fontStyle: 'italic' }}>
+                                    {rec.reason}
+                                  </Typography>
+
+                                  <Button
+                                    fullWidth size="small" variant="contained"
+                                    onClick={(e) => { e.stopPropagation(); handleApplyRecommendation(rec); }}
+                                    sx={{ bgcolor: style.solid, borderRadius: '8px', textTransform: 'none', fontWeight: 700, '&:hover': { bgcolor: style.solid, opacity: 0.85 } }}
+                                  >
+                                    Apply
+                                  </Button>
+                                </Paper>
+                              );
+                            })}
+                          </Stack>
+                        )}
+                      </Box>
+                    )}
+                  </Paper>
+                </Box>
+              )}
             </Box>
 
             <DragOverlay dropAnimation={null}>

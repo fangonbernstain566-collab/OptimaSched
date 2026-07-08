@@ -10,6 +10,12 @@ import teacherRoutes from './routes/teacher.routes.js';
 import roomRoutes from './routes/room.routes.js'; // Import the room routes
 import auditLogRoutes from './routes/auditLog.routes.js';
 import subjectOfferingRoutes from './routes/subjectOffering.routes.js';
+import settingsRoutes from './routes/settings.routes.js';
+import timmyRoutes from './routes/timmy.routes.js';
+import paymentRoutes from './routes/payment.routes.js';
+import availabilityRoutes from './routes/availability.routes.js';
+import scheduleRequestRoutes from './routes/scheduleRequest.routes.js';
+import notificationRoutes from './routes/notification.routes.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -33,6 +39,12 @@ app.use('/api/teachers', teacherRoutes); // Cleanly structured mounting point
 app.use('/api/rooms', roomRoutes); // Mount the room route
 app.use('/api/audit-logs', auditLogRoutes);
 app.use('/api/subject-offerings', subjectOfferingRoutes);
+app.use('/api/settings', settingsRoutes);
+app.use('/api/timmy', timmyRoutes);
+app.use('/api/payments', paymentRoutes);
+app.use('/api/availability', availabilityRoutes);
+app.use('/api/schedule-requests', scheduleRequestRoutes);
+app.use('/api/notifications', notificationRoutes);
 // Centralized error interceptor fallback hook (Must remain last)
 app.use(errorHandler);
 

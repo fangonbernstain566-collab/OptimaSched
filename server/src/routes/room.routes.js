@@ -4,7 +4,10 @@ import { authenticate, authorize } from '../middleware/auth.js';
 import { logAudit } from '../utils/auditLog.js';
 
 const router = Router();
-router.use(authenticate, authorize('ADMINISTRATOR'));
+// Listing rooms is needed by any authenticated role that views schedules
+// (Registrar's Schedule Plotter, Instructor's schedule view, Cashier's
+// read-only schedule view) — only mutations stay Administrator-only.
+router.use(authenticate);
 
 const VALID_ROOM_TYPES = [
   'LECTURE_ROOM',
@@ -89,7 +92,7 @@ router.get('/', async (req, res) => {
 
 // GET /api/rooms/recently-deleted
 // List soft-deleted rooms
-router.get('/recently-deleted', async (req, res) => {
+router.get('/recently-deleted', authorize('ADMINISTRATOR'), async (req, res) => {
   try {
     const deletedRooms = await prisma.room.findMany({
       where: { isDeleted: true },
@@ -106,7 +109,7 @@ router.get('/recently-deleted', async (req, res) => {
 
 // POST /api/rooms
 // Create a new room
-router.post('/', async (req, res) => {
+router.post('/', authorize('ADMINISTRATOR'), async (req, res) => {
   try {
     const {
       name,
@@ -209,7 +212,7 @@ router.post('/', async (req, res) => {
 
 // PUT /api/rooms/:id
 // Update room details
-router.put('/:id', async (req, res) => {
+router.put('/:id', authorize('ADMINISTRATOR'), async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -310,7 +313,7 @@ router.put('/:id', async (req, res) => {
 
 // PATCH /api/rooms/:id/restore
 // Restore a soft-deleted room
-router.patch('/:id/restore', async (req, res) => {
+router.patch('/:id/restore', authorize('ADMINISTRATOR'), async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -349,7 +352,7 @@ router.patch('/:id/restore', async (req, res) => {
 
 // DELETE /api/rooms/:id/permanent
 // Hard-delete a soft-deleted room
-router.delete('/:id/permanent', async (req, res) => {
+router.delete('/:id/permanent', authorize('ADMINISTRATOR'), async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -387,7 +390,7 @@ router.delete('/:id/permanent', async (req, res) => {
 
 // DELETE /api/rooms/:id
 // Soft-delete room only if it is not used by schedules
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', authorize('ADMINISTRATOR'), async (req, res) => {
   try {
     const { id } = req.params;
 

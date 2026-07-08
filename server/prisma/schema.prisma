@@ -15,17 +15,62 @@ model Role {
 }
 
 model User {
-  id           String     @id @default(uuid())
-  email        String     @unique
+  id           String        @id @default(uuid())
+  email        String        @unique
   passwordHash String
   firstName    String
   lastName     String
   roleId       String
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
   auditLogs    AuditLog[]
   teacher      Teacher?
-  role         Role       @relation(fields: [roleId], references: [id])
+  settings     UserSettings?
+  payments     Payment[]
+  reviewedRequests ScheduleRequest[]
+  notifications Notification[]
+  role         Role          @relation(fields: [roleId], references: [id])
+}
+
+model Payment {
+  id          String        @id @default(uuid())
+  studentName String
+  studentId   String
+  amount      Float
+  type        PaymentType
+  method      PaymentMethod
+  status      PaymentStatus @default(CONFIRMED)
+  notes       String?
+  cashierId   String
+  cashier     User          @relation(fields: [cashierId], references: [id])
+  isDeleted   Boolean       @default(false)
+  deletedAt   DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@index([createdAt])
+  @@index([cashierId])
+  @@index([status])
+}
+
+model UserSettings {
+  id     String @id @default(uuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Accessibility
+  themeMode     ThemeMode @default(LIGHT)
+  fontSize      FontSize  @default(MEDIUM)
+  highContrast  Boolean   @default(false)
+  reducedMotion Boolean   @default(false)
+
+  // Common / general
+  emailNotifications Boolean @default(true)
+  inAppNotifications Boolean @default(true)
+  defaultLandingPage String  @default("/dashboard")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model College {
@@ -53,6 +98,7 @@ model Teacher {
   deletedAt       DateTime?
   availabilities  Availability[]
   schedules       Schedule[]
+  scheduleRequests ScheduleRequest[]
   department      Department     @relation(fields: [departmentId], references: [id])
   user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
@@ -83,6 +129,7 @@ model Room {
   createdAt  DateTime   @default(now())
   building   Building   @relation(fields: [buildingId], references: [id], onDelete: Cascade)
   schedules  Schedule[]
+  scheduleRequests ScheduleRequest[]
 }
 
 model Subject {
@@ -100,6 +147,7 @@ model SubjectOffering {
   subjectId String
   classCode String     @unique
   schedules Schedule[]
+  scheduleRequests ScheduleRequest[]
   subject   Subject    @relation(fields: [subjectId], references: [id], onDelete: Cascade)
 }
 
@@ -109,6 +157,7 @@ model Section {
   program   String
   yearLevel Int
   schedules Schedule[]
+  scheduleRequests ScheduleRequest[]
 }
 
 // Maps which subjects belong to a given program + year level curriculum.
@@ -188,12 +237,96 @@ model Schedule {
   teacher           Teacher         @relation(fields: [teacherId], references: [id])
 }
 
+model ScheduleRequest {
+  id                  String        @id @default(uuid())
+  teacherId           String
+  teacher             Teacher       @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  subjectOfferingId   String
+  subjectOffering     SubjectOffering @relation(fields: [subjectOfferingId], references: [id])
+  sectionId           String
+  section             Section       @relation(fields: [sectionId], references: [id])
+  roomId              String?
+  room                Room?         @relation(fields: [roomId], references: [id])
+  dayOfWeek           String
+  startTime           String
+  endTime             String
+  studentCount        Int           @default(0)
+  notes               String?
+  status              RequestStatus @default(PENDING)
+  reviewedById        String?
+  reviewedBy          User?         @relation(fields: [reviewedById], references: [id])
+  reviewNotes         String?
+  resultingScheduleId String?
+  isDeleted           Boolean       @default(false)
+  deletedAt           DateTime?
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+
+  @@index([teacherId, status])
+  @@index([status, createdAt])
+}
+
+enum RequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  message   String
+  type      String
+  link      String?
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId, isRead])
+  @@index([userId, createdAt])
+}
+
 enum RoleName {
   ADMINISTRATOR
   REGISTRAR_SCHEDULER
   CASHIER
   INSTRUCTOR
   STUDENT
+}
+
+enum ThemeMode {
+  LIGHT
+  DARK
+  SYSTEM
+}
+
+enum FontSize {
+  SMALL
+  MEDIUM
+  LARGE
+}
+
+enum PaymentType {
+  TUITION_FEE
+  MISCELLANEOUS
+  LAB_FEE
+  ENROLLMENT_FEE
+  PARTIAL_PAYMENT
+  ID_FEE
+  OTHER
+}
+
+enum PaymentMethod {
+  CASH
+  GCASH
+  BANK_TRANSFER
+}
+
+enum PaymentStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
 }
 
 enum RoomType {

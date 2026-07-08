@@ -14,6 +14,23 @@ import RecentlyDeletedTeachers from './pages/RecentlyDeletedTeachers';
 import RecentlyDeletedRooms from './pages/RecentlyDeletedRooms';
 import AuditLogs from './pages/AuditLogs';
 import InstructorSchedules from './pages/InstructorSchedules';
+import Settings from './pages/Settings';
+import CashierDashboard from './pages/cashier/CashierDashboard';
+import CashierFaculty from './pages/cashier/CashierFaculty';
+import CashierClasses from './pages/cashier/CashierClasses';
+import CashierSchedule from './pages/cashier/CashierSchedule';
+import CashierReports from './pages/cashier/CashierReports';
+import RegistrarDashboard from './pages/registrar/RegistrarDashboard';
+import RegistrarFaculty from './pages/registrar/RegistrarFaculty';
+import RegistrarClassList from './pages/registrar/RegistrarClassList';
+import RegistrarSchedule from './pages/registrar/RegistrarSchedule';
+import RegistrarTimmy from './pages/registrar/RegistrarTimmy';
+import CashierTimmy from './pages/cashier/CashierTimmy';
+import InstructorTimmy from './pages/instructor/InstructorTimmy';
+import InstructorAvailability from './pages/instructor/InstructorAvailability';
+import ScheduleRequests from './pages/ScheduleRequests';
+import CashierRecentlyDeleted from './pages/cashier/CashierRecentlyDeleted';
+import InstructorRecentlyDeleted from './pages/instructor/InstructorRecentlyDeleted';
 
 export default function App() {
   return (
@@ -123,6 +140,140 @@ export default function App() {
           element={
             <ProtectedRoute allowedRoles={['INSTRUCTOR']}>
               <InstructorSchedules />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route path="settings" element={<Settings />} />
+
+        <Route
+          path="instructor/timmy"
+          element={
+            <ProtectedRoute allowedRoles={['INSTRUCTOR']}>
+              <InstructorTimmy />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="instructor/availability"
+          element={
+            <ProtectedRoute allowedRoles={['INSTRUCTOR']}>
+              <InstructorAvailability />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="instructor/recently-deleted"
+          element={
+            <ProtectedRoute allowedRoles={['INSTRUCTOR']}>
+              <InstructorRecentlyDeleted />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="schedule-requests"
+          element={
+            <ProtectedRoute allowedRoles={['ADMINISTRATOR', 'REGISTRAR_SCHEDULER']}>
+              <ScheduleRequests />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="cashier/dashboard"
+          element={
+            <ProtectedRoute allowedRoles={['CASHIER']}>
+              <CashierDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="cashier/faculty"
+          element={
+            <ProtectedRoute allowedRoles={['CASHIER']}>
+              <CashierFaculty />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="cashier/classes"
+          element={
+            <ProtectedRoute allowedRoles={['CASHIER']}>
+              <CashierClasses />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="cashier/schedule"
+          element={
+            <ProtectedRoute allowedRoles={['CASHIER']}>
+              <CashierSchedule />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="cashier/reports"
+          element={
+            <ProtectedRoute allowedRoles={['CASHIER']}>
+              <CashierReports />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="cashier/timmy"
+          element={
+            <ProtectedRoute allowedRoles={['CASHIER']}>
+              <CashierTimmy />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="cashier/recently-deleted"
+          element={
+            <ProtectedRoute allowedRoles={['CASHIER']}>
+              <CashierRecentlyDeleted />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="registrar/dashboard"
+          element={
+            <ProtectedRoute allowedRoles={['REGISTRAR_SCHEDULER']}>
+              <RegistrarDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="registrar/faculty"
+          element={
+            <ProtectedRoute allowedRoles={['REGISTRAR_SCHEDULER']}>
+              <RegistrarFaculty />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="registrar/classes"
+          element={
+            <ProtectedRoute allowedRoles={['REGISTRAR_SCHEDULER']}>
+              <RegistrarClassList />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="registrar/schedule"
+          element={
+            <ProtectedRoute allowedRoles={['REGISTRAR_SCHEDULER']}>
+              <RegistrarSchedule />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="registrar/timmy"
+          element={
+            <ProtectedRoute allowedRoles={['REGISTRAR_SCHEDULER']}>
+              <RegistrarTimmy />
             </ProtectedRoute>
           }
         />
