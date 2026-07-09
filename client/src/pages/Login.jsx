@@ -19,7 +19,7 @@ import pcluLogo from '../upload/22.png';
 
 // ─── Design tokens (from Figma theme.css) ────────────────────────────────────
 const C = {
-  primary:    '#ff00bb',   // navy
+  primary:    '#1B2B5E',   // navy
   accent:     '#C49A3C',   // gold
   background: '#F2F0EB',   // warm beige
   card:       '#ffffff',
