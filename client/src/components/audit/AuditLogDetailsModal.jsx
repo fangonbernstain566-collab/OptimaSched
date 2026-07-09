@@ -12,7 +12,7 @@ import CloseIcon from '@mui/icons-material/Close';
 
 const Item = ({ label, value }) => (
   <>
-    <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 700 }}>
+    <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 700 }}>
       {label}
     </Typography>
     <Typography variant="body2" sx={{ mb: 1.5, wordBreak: 'break-word' }}>
@@ -65,7 +65,7 @@ export default function AuditLogDetailsModal({ open, onClose, log }) {
 
             <Item label="Description" value={log.description} />
 
-            <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 700 }}>
+            <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 700 }}>
               Metadata
             </Typography>
             <Typography
@@ -74,8 +74,8 @@ export default function AuditLogDetailsModal({ open, onClose, log }) {
                 mt: 0.5,
                 p: 1.5,
                 borderRadius: '8px',
-                bgcolor: '#f8fafc',
-                border: '1px solid #e2e8f0',
+                bgcolor: 'action.hover',
+                border: '1px solid', borderColor: 'divider',
                 fontSize: '0.8rem',
                 overflowX: 'auto',
               }}

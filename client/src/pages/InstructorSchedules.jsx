@@ -152,7 +152,7 @@ export default function InstructorSchedules() {
   }
 
   return (
-    <Box sx={{ p: 4, minHeight: '100vh', bgcolor: '#f8fafc', mt: -4, mx: -4 }}>
+    <Box sx={{ p: 4, minHeight: '100vh', bgcolor: 'background.default', mt: -4, mx: -4 }}>
       {/* Header */}
       <Box sx={{ mb: 4 }}>
         <Typography variant="h4" fontWeight="700" sx={{ mb: 1, color: '#1B2B5E' }}>
@@ -189,7 +189,7 @@ export default function InstructorSchedules() {
                 alignItems: 'center',
                 fontWeight: '600',
                 fontSize: '0.875rem',
-                color: '#64748b',
+                color: 'text.secondary',
                 px: 2,
               }}
             >
@@ -233,7 +233,7 @@ export default function InstructorSchedules() {
                             justifyContent: 'center',
                             cursor: occupied ? 'not-allowed' : 'pointer',
                             backgroundColor: occupied ? '#fee2e2' : '#f8fafc',
-                            borderColor: occupied ? '#fca5a5' : '#e2e8f0',
+                            borderColor: occupied ? '#fca5a5' : 'divider',
                             transition: 'all 0.2s ease',
                             '&:hover': !occupied && {
                               backgroundColor: '#e0e7ff',

@@ -54,7 +54,7 @@ export default function InstructorTimmy() {
       <Toast toast={toast} onClose={hideToast} />
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
         <TimmyIcon sx={{ color: '#6d28d9' }} />
-        <Typography variant="h4" fontWeight="800" sx={{ color: '#1e293b' }}>Ask Timmy</Typography>
+        <Typography variant="h4" fontWeight="800" sx={{ color: 'text.primary' }}>Ask Timmy</Typography>
       </Box>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
         Load and transition analysis for your own placed schedule.
@@ -62,15 +62,15 @@ export default function InstructorTimmy() {
 
       <Grid container spacing={2.5} sx={{ mb: 3 }}>
         <Grid item xs={12} sm={6}>
-          <Paper sx={{ p: 2.5, borderRadius: '16px', border: '1px solid #e2e8f0' }}>
-            <Typography variant="body2" sx={{ color: '#64748b', fontWeight: 600, mb: 0.5 }}>Teaching Load</Typography>
+          <Paper sx={{ p: 2.5, borderRadius: '16px', border: '1px solid', borderColor: 'divider' }}>
+            <Typography variant="body2" sx={{ color: 'text.secondary', fontWeight: 600, mb: 0.5 }}>Teaching Load</Typography>
             <Typography variant="h4" fontWeight="800" sx={{ color: loadColor }}>
               {insights.currentUnits} / {insights.maxTeachingLoad} units
             </Typography>
             <LinearProgress
               variant="determinate"
               value={Math.min(insights.loadPercentage, 100)}
-              sx={{ mt: 1.5, height: 8, borderRadius: '20px', bgcolor: '#f1f5f9', '& .MuiLinearProgress-bar': { bgcolor: loadColor, borderRadius: '20px' } }}
+              sx={{ mt: 1.5, height: 8, borderRadius: '20px', bgcolor: 'action.hover', '& .MuiLinearProgress-bar': { bgcolor: loadColor, borderRadius: '20px' } }}
             />
             <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
               {insights.loadPercentage}% of declared maximum
@@ -78,15 +78,15 @@ export default function InstructorTimmy() {
           </Paper>
         </Grid>
         <Grid item xs={12} sm={6}>
-          <Paper sx={{ p: 2.5, borderRadius: '16px', border: '1px solid #e2e8f0' }}>
-            <Typography variant="body2" sx={{ color: '#64748b', fontWeight: 600, mb: 0.5 }}>Placed Classes</Typography>
-            <Typography variant="h4" fontWeight="800" sx={{ color: '#1e293b' }}>{insights.totalClasses}</Typography>
+          <Paper sx={{ p: 2.5, borderRadius: '16px', border: '1px solid', borderColor: 'divider' }}>
+            <Typography variant="body2" sx={{ color: 'text.secondary', fontWeight: 600, mb: 0.5 }}>Placed Classes</Typography>
+            <Typography variant="h4" fontWeight="800" sx={{ color: 'text.primary' }}>{insights.totalClasses}</Typography>
             <Typography variant="caption" color="text.secondary">Currently scheduled</Typography>
           </Paper>
         </Grid>
       </Grid>
 
-      <Paper sx={{ p: 3, borderRadius: '16px', border: '1px solid #e2e8f0' }}>
+      <Paper sx={{ p: 3, borderRadius: '16px', border: '1px solid', borderColor: 'divider' }}>
         <Typography variant="subtitle1" fontWeight="700" sx={{ mb: 2 }}>Warnings</Typography>
         {insights.warnings.length === 0 ? (
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, py: 3, justifyContent: 'center' }}>

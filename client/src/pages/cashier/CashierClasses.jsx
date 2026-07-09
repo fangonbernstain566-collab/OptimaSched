@@ -31,18 +31,18 @@ export default function CashierClasses() {
   return (
     <Box sx={{ maxWidth: 1400, mx: 'auto' }}>
       <Toast toast={toast} onClose={hideToast} />
-      <Typography variant="h4" fontWeight="800" sx={{ mb: 0.5, color: '#1e293b' }}>Manage Class List</Typography>
+      <Typography variant="h4" fontWeight="800" sx={{ mb: 0.5, color: 'text.primary' }}>Manage Class List</Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
         Read-only roster of currently placed classes.
       </Typography>
 
-      <Paper sx={{ borderRadius: '16px', border: '1px solid #e2e8f0' }}>
+      <Paper sx={{ borderRadius: '16px', border: '1px solid', borderColor: 'divider' }}>
         <TableContainer>
           <Table>
             <TableHead>
               <TableRow>
                 {['Class Code', 'Subject', 'Instructor', 'Section', 'Enrolled', 'Schedule', 'Room'].map((h) => (
-                  <TableCell key={h} sx={{ fontWeight: 700, fontSize: '0.7rem', textTransform: 'uppercase', color: '#64748b' }}>{h}</TableCell>
+                  <TableCell key={h} sx={{ fontWeight: 700, fontSize: '0.7rem', textTransform: 'uppercase', color: 'text.secondary' }}>{h}</TableCell>
                 ))}
               </TableRow>
             </TableHead>
@@ -63,7 +63,7 @@ export default function CashierClasses() {
                     </TableCell>
                     <TableCell>{s.section?.name ?? '—'}</TableCell>
                     <TableCell>
-                      <Chip label={`${s.studentCount ?? 0}`} size="small" sx={{ bgcolor: '#f1f5f9' }} />
+                      <Chip label={`${s.studentCount ?? 0}`} size="small" sx={{ bgcolor: 'action.hover' }} />
                     </TableCell>
                     <TableCell>{s.dayOfWeek} {s.startTime}–{s.endTime}</TableCell>
                     <TableCell>{s.room?.name ?? '—'}</TableCell>

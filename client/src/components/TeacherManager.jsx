@@ -166,14 +166,14 @@ export default function TeacherManager() {
   };
 
   return (
-    <Box sx={{ p: 4, minHeight: '100vh', bgcolor: '#f8fafc', mt: -4 }}>
+    <Box sx={{ p: 4, minHeight: '100vh', bgcolor: 'background.default', mt: -4 }}>
       <Toast toast={toast} onClose={hideToast} />
 
       <Box sx={{ maxWidth: '1300px', mx: 'auto' }}>
 
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
           <Box>
-            <Typography variant="h4" fontWeight={800} sx={{ color: '#1e293b' }}>
+            <Typography variant="h4" fontWeight={800} sx={{ color: 'text.primary' }}>
               Manage Teachers
             </Typography>
             <Typography color="text.secondary">
@@ -209,7 +209,7 @@ export default function TeacherManager() {
             <TableContainer>
               <Table>
                 <TableHead>
-                  <TableRow sx={{ bgcolor: '#f1f5f9' }}>
+                  <TableRow sx={{ bgcolor: 'action.hover' }}>
                     <SortableTableCell label="Name" sortKey="lastName" sortBy={sort.sortBy} order={sort.order} onSort={handleSort} />
                     <SortableTableCell label="Academic Email Address" sortKey="email" sortBy={sort.sortBy} order={sort.order} onSort={handleSort} />
                     <SortableTableCell label="Assigned Department" sortKey="department" sortBy={sort.sortBy} order={sort.order} onSort={handleSort} />
@@ -221,7 +221,7 @@ export default function TeacherManager() {
                 <TableBody>
                   {teachers.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} align="center" sx={{ py: 6, color: '#94a3b8' }}>
+                      <TableCell colSpan={6} align="center" sx={{ py: 6, color: 'text.disabled' }}>
                         No active instructors registered in the database system yet.
                       </TableCell>
                     </TableRow>

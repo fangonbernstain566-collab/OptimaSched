@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import NotificationBell from '../components/NotificationBell';
+import SystemClock from '../components/SystemClock';
 import {
   Box, Drawer, AppBar, Toolbar, List, Typography, Divider,
   IconButton, ListItem, ListItemButton, ListItemIcon, ListItemText,
@@ -731,6 +732,9 @@ export default function DashboardLayout() {
               A.Y. 2026–2027
             </Typography>
           </Box>
+
+          {/* System time */}
+          <SystemClock C={C} />
 
           {/* Notifications */}
           <Box sx={{ color: C.primary }}>

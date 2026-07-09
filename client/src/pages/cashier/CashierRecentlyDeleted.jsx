@@ -66,7 +66,7 @@ export default function CashierRecentlyDeleted() {
       <Toast toast={toast} onClose={hideToast} />
 
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
-        <Typography variant="h4" fontWeight="800" sx={{ color: '#1e293b' }}>
+        <Typography variant="h4" fontWeight="800" sx={{ color: 'text.primary' }}>
           Recently Deleted Payments
         </Typography>
         <Button
@@ -84,10 +84,10 @@ export default function CashierRecentlyDeleted() {
           <CircularProgress />
         </Box>
       ) : (
-        <Paper sx={{ borderRadius: '16px', overflowX: 'auto', border: '1px solid #e2e8f0' }}>
+        <Paper sx={{ borderRadius: '16px', overflowX: 'auto', border: '1px solid', borderColor: 'divider' }}>
           <Table>
             <TableHead>
-              <TableRow sx={{ bgcolor: '#f1f5f9' }}>
+              <TableRow sx={{ bgcolor: 'action.hover' }}>
                 {['Student', 'Amount', 'Type', 'Method', 'Date Deleted', 'Actions'].map((header) => (
                   <TableCell key={header} sx={{ fontWeight: 'bold', whiteSpace: 'nowrap' }}>{header}</TableCell>
                 ))}
@@ -96,7 +96,7 @@ export default function CashierRecentlyDeleted() {
             <TableBody>
               {deleted.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} align="center" sx={{ py: 6, color: '#94a3b8' }}>
+                  <TableCell colSpan={6} align="center" sx={{ py: 6, color: 'text.disabled' }}>
                     No recently deleted payments.
                   </TableCell>
                 </TableRow>

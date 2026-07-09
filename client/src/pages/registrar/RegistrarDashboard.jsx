@@ -12,16 +12,16 @@ import { useToast } from '../../hooks/useToast';
 import Toast from '../../components/Toast';
 
 const StatCard = ({ label, value, sub, icon, iconBg }) => (
-  <Paper sx={{ p: 2.5, borderRadius: '16px', border: '1px solid #e2e8f0', height: '100%' }}>
+  <Paper sx={{ p: 2.5, borderRadius: '16px', border: '1px solid', borderColor: 'divider', height: '100%' }}>
     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1.5 }}>
-      <Typography variant="body2" sx={{ color: '#64748b', fontWeight: 600, maxWidth: '70%' }}>{label}</Typography>
+      <Typography variant="body2" sx={{ color: 'text.secondary', fontWeight: 600, maxWidth: '70%' }}>{label}</Typography>
       <Box sx={{ width: 40, height: 40, borderRadius: '50%', bgcolor: iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
         {icon}
       </Box>
     </Box>
-    <Typography variant="h4" fontWeight="800" sx={{ color: '#1e293b' }}>{value}</Typography>
+    <Typography variant="h4" fontWeight="800" sx={{ color: 'text.primary' }}>{value}</Typography>
     {sub && (
-      <Typography variant="caption" sx={{ display: 'inline-block', mt: 1, px: 1.5, py: 0.5, borderRadius: '20px', bgcolor: '#f1f5f9', color: '#475569', fontWeight: 700 }}>
+      <Typography variant="caption" sx={{ display: 'inline-block', mt: 1, px: 1.5, py: 0.5, borderRadius: '20px', bgcolor: 'action.hover', color: 'text.secondary', fontWeight: 700 }}>
         {sub}
       </Typography>
     )}
@@ -68,7 +68,7 @@ export default function RegistrarDashboard() {
   return (
     <Box sx={{ maxWidth: 1400, mx: 'auto' }}>
       <Toast toast={toast} onClose={hideToast} />
-      <Typography variant="h4" fontWeight="800" sx={{ mb: 3, color: '#1e293b' }}>Analytics Overview</Typography>
+      <Typography variant="h4" fontWeight="800" sx={{ mb: 3, color: 'text.primary' }}>Analytics Overview</Typography>
 
       <Grid container spacing={2.5} sx={{ mb: 1 }}>
         <Grid item xs={12} sm={6} md={3}>

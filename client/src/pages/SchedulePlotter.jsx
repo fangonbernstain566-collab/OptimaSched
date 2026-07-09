@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import axios from 'axios';
 import {
   DndContext, DragOverlay, useDraggable, useDroppable,
@@ -9,6 +9,7 @@ import {
   Box, Typography, Paper, Chip, Tab, Tabs,
   CircularProgress, Button, Modal, Stack, Divider,
   Tooltip, IconButton, GlobalStyles,
+  FormControl, Select, MenuItem, ListSubheader,
 } from '@mui/material';
 import {
   DragIndicator as DragIcon,
@@ -26,8 +27,8 @@ import Toast from '../components/Toast';
 import { getTimmyRecommendations } from '../services/timmyApi';
 
 const DAYS       = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
-const SLOT_MINUTES = 30;
-const GRID_START = '07:30';
+const SLOT_MINUTES = 60;
+const GRID_START = '07:00';
 const GRID_END   = '18:00';
 
 // Visual language for Timmy's top-3, ranked by prominence.
@@ -106,6 +107,79 @@ const getRoomRecommendations = (recommendations, roomId, day) => {
 
 const recKey = (rec) => `${rec.roomId}||${rec.startTime}||${rec.day}`;
 
+// Sorting options for the Pending Queue — grouped for the sort <Select>.
+// Each option's value encodes "<field>_<direction>"; 'default' restores fetch order.
+const SORT_GROUPS = [
+  { label: 'General', options: [
+    { value: 'default', label: 'Default (Original Order)' },
+  ] },
+  { label: 'Subject', options: [
+    { value: 'subjectCode_asc',  label: 'Subject Code (A → Z)' },
+    { value: 'subjectCode_desc', label: 'Subject Code (Z → A)' },
+  ] },
+  { label: 'Teacher', options: [
+    { value: 'teacherName_asc',  label: 'Teacher Name (A → Z)' },
+    { value: 'teacherName_desc', label: 'Teacher Name (Z → A)' },
+  ] },
+  { label: 'Program', options: [
+    { value: 'program_asc',  label: 'Course / Program (A → Z)' },
+    { value: 'program_desc', label: 'Course / Program (Z → A)' },
+  ] },
+  { label: 'Academic Level', options: [
+    { value: 'yearLevel_asc',  label: 'Year Level (Ascending)' },
+    { value: 'yearLevel_desc', label: 'Year Level (Descending)' },
+  ] },
+  { label: 'Section', options: [
+    { value: 'section_asc',  label: 'Section (A → Z)' },
+    { value: 'section_desc', label: 'Section (Z → A)' },
+  ] },
+  { label: 'Teaching Load', options: [
+    { value: 'units_asc',  label: 'Units (Lowest → Highest)' },
+    { value: 'units_desc', label: 'Units (Highest → Lowest)' },
+  ] },
+  { label: 'Location', options: [
+    { value: 'building_asc',  label: 'Building (A → Z)' },
+    { value: 'building_desc', label: 'Building (Z → A)' },
+    { value: 'floor_asc',     label: 'Floor (Lowest → Highest)' },
+    { value: 'floor_desc',    label: 'Floor (Highest → Lowest)' },
+  ] },
+];
+
+// Numeric fields are compared as numbers; everything else falls back to a locale string compare.
+const NUMERIC_SORT_FIELDS = new Set(['yearLevel', 'units', 'floor']);
+
+// Pulls the raw value used to sort a pending schedule, for a given field name.
+// `roomsById` supplies building/floor info, since a Schedule only carries a roomId.
+const getSortValue = (schedule, field, roomsById) => {
+  switch (field) {
+    case 'subjectCode':  return schedule.subjectOffering?.subject?.code ?? null;
+    case 'teacherName':  return schedule.teacher?.user
+      ? `${schedule.teacher.user.lastName} ${schedule.teacher.user.firstName}`
+      : null;
+    case 'program':      return schedule.section?.program ?? null;
+    case 'yearLevel':    return schedule.section?.yearLevel ?? null;
+    case 'section':      return schedule.section?.name ?? null;
+    case 'units':        return schedule.subjectOffering?.subject?.units ?? null;
+    case 'building':     return roomsById.get(schedule.roomId)?.building?.name ?? null;
+    // No floor field exists on Room/Building yet, so this is always missing —
+    // every card falls to the end per the "missing field" rule, i.e. a safe no-op.
+    case 'floor':        return roomsById.get(schedule.roomId)?.floor ?? null;
+    default:             return null;
+  }
+};
+
+// Generic comparator: missing values always sort to the end regardless of direction,
+// so an unsortable field never throws and never silently reorders around bad data.
+const compareSortValues = (a, b, direction, isNumeric) => {
+  const missingA = a === null || a === undefined || a === '';
+  const missingB = b === null || b === undefined || b === '';
+  if (missingA && missingB) return 0;
+  if (missingA) return 1;
+  if (missingB) return -1;
+  if (isNumeric) return (Number(a) - Number(b)) * direction;
+  return String(a).localeCompare(String(b)) * direction;
+};
+
 // Composes dnd-kit's callback ref with our own, so a single DOM node can be
 // tracked by both the droppable sensor and Timmy's "scroll into view" logic.
 const mergeRefs = (...refs) => (node) => {
@@ -123,20 +197,20 @@ const buildTooltip = (occupant) => {
     : 'Unassigned';
 
   return (
-    <Box sx={{ p: 0.5 }}>
-      <Typography variant="subtitle2" fontWeight="700" sx={{ mb: 0.75 }}>
+    <Box sx={{ p: 0.5, color: '#fff' }}>
+      <Typography variant="subtitle2" fontWeight="700" sx={{ mb: 0.75, color: 'inherit' }}>
         {occupant.subjectOffering?.subject?.name ?? 'Unknown Subject'}
       </Typography>
       <Stack spacing={0.4}>
-        <Typography variant="caption" display="block">🔖 Class Code: {occupant.subjectOffering?.classCode ?? '—'}</Typography>
-        <Typography variant="caption" display="block">👤 {teacherName}</Typography>
-        <Typography variant="caption" display="block">🏷 Section: {occupant.section?.name ?? '—'}</Typography>
-        <Typography variant="caption" display="block">👥 Students: {occupant.studentCount ?? 0}</Typography>
-        <Typography variant="caption" display="block">⏰ {formatTime(occupant.startTime)} – {formatTime(occupant.endTime)}</Typography>
-        <Typography variant="caption" display="block">
+        <Typography variant="caption" display="block" sx={{ color: 'inherit' }}>🔖 Class Code: {occupant.subjectOffering?.classCode ?? '—'}</Typography>
+        <Typography variant="caption" display="block" sx={{ color: 'inherit' }}>👤 {teacherName}</Typography>
+        <Typography variant="caption" display="block" sx={{ color: 'inherit' }}>🏷 Section: {occupant.section?.name ?? '—'}</Typography>
+        <Typography variant="caption" display="block" sx={{ color: 'inherit' }}>👥 Students: {occupant.studentCount ?? 0}</Typography>
+        <Typography variant="caption" display="block" sx={{ color: 'inherit' }}>⏰ {formatTime(occupant.startTime)} – {formatTime(occupant.endTime)}</Typography>
+        <Typography variant="caption" display="block" sx={{ color: 'inherit' }}>
           📅 {occupant.schoolYear?.name ?? '—'} · {occupant.semester?.name ?? '—'}
         </Typography>
-        <Typography variant="caption" display="block">📌 Status: {occupant.status}</Typography>
+        <Typography variant="caption" display="block" sx={{ color: 'inherit' }}>📌 Status: {occupant.status}</Typography>
       </Stack>
     </Box>
   );
@@ -157,7 +231,7 @@ const PendingCard = ({ schedule, onAskTimmy, timmyLoading, isActive }) => {
       sx={{
         p: 2, mb: 1.5, borderRadius: '12px',
         border: '2px solid',
-        borderColor: isActive ? '#6d28d9' : isDragging ? '#2563eb' : '#e2e8f0',
+        borderColor: isActive ? '#6d28d9' : isDragging ? '#2563eb' : 'divider',
         opacity: isDragging ? 0.35 : 1,
         cursor: 'grab', userSelect: 'none',
         transform: CSS.Translate.toString(transform),
@@ -166,14 +240,14 @@ const PendingCard = ({ schedule, onAskTimmy, timmyLoading, isActive }) => {
       }}
     >
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.75 }}>
-        <DragIcon sx={{ color: '#94a3b8', fontSize: 18, flexShrink: 0 }} />
+        <DragIcon sx={{ color: 'text.disabled', fontSize: 18, flexShrink: 0 }} />
         <Typography variant="body2" fontWeight="700" noWrap>
           {schedule.subjectOffering?.subject?.name ?? 'Unknown Subject'}
         </Typography>
       </Box>
 
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.4 }}>
-        <PersonIcon sx={{ fontSize: 13, color: '#64748b' }} />
+        <PersonIcon sx={{ fontSize: 13, color: 'text.secondary' }} />
         <Typography variant="caption" color="text.secondary" noWrap>
           {schedule.teacher?.user
             ? `${schedule.teacher.user.firstName} ${schedule.teacher.user.lastName}`
@@ -182,7 +256,7 @@ const PendingCard = ({ schedule, onAskTimmy, timmyLoading, isActive }) => {
       </Box>
 
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 1 }}>
-        <GroupIcon sx={{ fontSize: 13, color: '#64748b' }} />
+        <GroupIcon sx={{ fontSize: 13, color: 'text.secondary' }} />
         <Typography variant="caption" color="text.secondary">
           {schedule.studentCount ?? 0} students · {schedule.section?.name ?? '—'}
         </Typography>
@@ -339,6 +413,7 @@ const SchedulePlotter = () => {
   const [activeSched, setActiveSched] = useState(null);
   const [loading, setLoading]         = useState(false);
   const [confirm, setConfirm]         = useState(null);
+  const [sortKey, setSortKey]         = useState('default');
 
   // { schedule, blocked, reason, recommendations } — populated by "Ask Timmy".
   // The Schedule Plotter never unmounts while this is open; it drives an
@@ -383,6 +458,25 @@ const SchedulePlotter = () => {
   };
 
   useEffect(() => { fetchData(); }, []);
+
+  // roomId -> room (with nested building) lookup, used only by the Location sort options.
+  const roomsById = useMemo(() => new Map(rooms.map((r) => [r.id, r])), [rooms]);
+
+  // Re-derives the displayed order from `pending` whenever the source data or the chosen
+  // sort changes. Never mutates `pending`/database data — purely a display-time reorder,
+  // and dnd-kit tracks drag identity by schedule id, not array position, so this is safe.
+  const sortedPending = useMemo(() => {
+    if (sortKey === 'default') return pending;
+    const [field, dir] = sortKey.split('_');
+    const direction = dir === 'desc' ? -1 : 1;
+    const isNumeric = NUMERIC_SORT_FIELDS.has(field);
+    return [...pending].sort((a, b) => compareSortValues(
+      getSortValue(a, field, roomsById),
+      getSortValue(b, field, roomsById),
+      direction,
+      isNumeric
+    ));
+  }, [pending, sortKey, roomsById]);
 
   const handleDragStart = ({ active }) => {
     setActiveSched(pending.find((s) => s.id === active.id) ?? null);
@@ -507,7 +601,7 @@ const SchedulePlotter = () => {
   const recommendations = timmyResult?.recommendations ?? [];
 
   return (
-    <Box sx={{ p: 4, minHeight: '100vh', bgcolor: '#f8fafc', mt: -4 }}>
+    <Box sx={{ p: 4, minHeight: '100vh', bgcolor: 'background.default', mt: -4 }}>
       <GlobalStyles
         styles={{
           '@keyframes timmyPulse': {
@@ -522,7 +616,7 @@ const SchedulePlotter = () => {
       <Box sx={{ maxWidth: '1700px', mx: 'auto' }}>
 
         <Box sx={{ mb: 4 }}>
-          <Typography variant="h4" fontWeight="800" sx={{ color: '#1e293b' }}>
+          <Typography variant="h4" fontWeight="800" sx={{ color: 'text.primary' }}>
             Schedule Plotter
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
@@ -545,41 +639,7 @@ const SchedulePlotter = () => {
             <Box sx={{ display: 'flex', gap: 3, alignItems: 'flex-start' }}>
 
               <Box sx={{ width: 250, flexShrink: 0 }}>
-                <Paper sx={{ p: 2, borderRadius: '16px', position: 'sticky', top: 24, maxHeight: '80vh', overflowY: 'auto' }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-                    <Typography variant="subtitle1" fontWeight="700">
-                      Pending Queue
-                    </Typography>
-                    <Chip
-                      label={pending.length}
-                      size="small"
-                      sx={{ bgcolor: '#2563eb', color: '#fff', fontWeight: 700 }}
-                    />
-                  </Box>
-
-                  {pending.length === 0 ? (
-                    <Box sx={{ textAlign: 'center', py: 4 }}>
-                      <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
-                        No pending schedules.
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        Go to Manage Schedules to create one.
-                      </Typography>
-                    </Box>
-                  ) : (
-                    pending.map((s) => (
-                      <PendingCard
-                        key={s.id}
-                        schedule={s}
-                        onAskTimmy={handleAskTimmy}
-                        timmyLoading={timmyLoadingId === s.id}
-                        isActive={timmyResult?.schedule?.id === s.id}
-                      />
-                    ))
-                  )}
-                </Paper>
-
-                <Paper sx={{ p: 2, borderRadius: '16px', mt: 2 }}>
+                <Paper sx={{ p: 2, borderRadius: '16px' }}>
                   <Typography variant="caption" fontWeight="700" display="block" sx={{ mb: 1.5 }}>
                     Legend
                   </Typography>
@@ -607,6 +667,63 @@ const SchedulePlotter = () => {
                         </Box>
                       ))}
                     </>
+                  )}
+                </Paper>
+
+                <Paper sx={{ p: 1.5, borderRadius: '16px', mt: 2 }}>
+                  <FormControl fullWidth size="small">
+                    <Select
+                      value={sortKey}
+                      onChange={(e) => setSortKey(e.target.value)}
+                      displayEmpty
+                      sx={{ fontSize: '0.8rem', borderRadius: '10px' }}
+                      MenuProps={{ PaperProps: { sx: { maxHeight: 400 } } }}
+                    >
+                      {SORT_GROUPS.flatMap((group) => [
+                        <ListSubheader key={`hdr-${group.label}`} sx={{ fontWeight: 700, lineHeight: '32px' }}>
+                          {group.label}
+                        </ListSubheader>,
+                        ...group.options.map((opt) => (
+                          <MenuItem key={opt.value} value={opt.value} sx={{ fontSize: '0.8rem' }}>
+                            {opt.label}
+                          </MenuItem>
+                        )),
+                      ])}
+                    </Select>
+                  </FormControl>
+                </Paper>
+
+                <Paper sx={{ p: 2, borderRadius: '16px', mt: 2, position: 'sticky', top: 24, maxHeight: '65vh', overflowY: 'auto' }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                    <Typography variant="subtitle1" fontWeight="700">
+                      Pending Queue
+                    </Typography>
+                    <Chip
+                      label={pending.length}
+                      size="small"
+                      sx={{ bgcolor: '#2563eb', color: '#fff', fontWeight: 700 }}
+                    />
+                  </Box>
+
+                  {pending.length === 0 ? (
+                    <Box sx={{ textAlign: 'center', py: 4 }}>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                        No pending schedules.
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        Go to Manage Schedules to create one.
+                      </Typography>
+                    </Box>
+                  ) : (
+                    sortedPending.map((s) => (
+                      <PendingCard
+                        key={s.id}
+                        schedule={s}
+                        onAskTimmy={handleAskTimmy}
+                        timmyLoading={timmyLoadingId === s.id}
+                        isActive={timmyResult?.schedule?.id === s.id}
+                      />
+                    ))
                   )}
                 </Paper>
               </Box>
@@ -666,7 +783,7 @@ const SchedulePlotter = () => {
                       <Box />
                       {TIME_SLOTS.map((t) => (
                         <Box key={t} sx={{ textAlign: 'center', pb: 0.5 }}>
-                          <Typography variant="caption" fontWeight="700" color="#475569">
+                          <Typography variant="caption" fontWeight="700" color="text.secondary">
                             {formatTime(t)}
                           </Typography>
                         </Box>
@@ -697,7 +814,8 @@ const SchedulePlotter = () => {
                               gridColumn: 1, gridRow,
                               display: 'flex', flexDirection: 'column',
                               justifyContent: 'center', pr: 1.5,
-                              borderRight: '2px solid #e2e8f0',
+                              borderRight: '2px solid',
+                              borderColor: 'divider',
                             }}>
                               <Typography variant="body2" fontWeight="700" noWrap>
                                 {room.name}
@@ -839,7 +957,7 @@ const SchedulePlotter = () => {
                                   </Box>
 
                                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
-                                    <RoomIcon sx={{ fontSize: 14, color: '#64748b' }} />
+                                    <RoomIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
                                     <Typography variant="body2" fontWeight="700">{rec.roomName}</Typography>
                                   </Box>
                                   <Typography variant="caption" color="text.secondary" display="block">
@@ -947,7 +1065,7 @@ const SchedulePlotter = () => {
                   <Box key={label} sx={{
                     display: 'flex', justifyContent: 'space-between',
                     alignItems: 'center', py: 0.5,
-                    borderBottom: '1px solid #f1f5f9',
+                    borderBottom: '1px solid', borderColor: 'divider',
                   }}>
                     <Typography variant="body2" color="text.secondary">{label}</Typography>
                     <Typography variant="body2" fontWeight="700">{value}</Typography>

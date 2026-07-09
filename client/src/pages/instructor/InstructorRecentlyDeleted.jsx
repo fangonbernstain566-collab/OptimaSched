@@ -90,10 +90,10 @@ export default function InstructorRecentlyDeleted() {
           <CircularProgress />
         </Box>
       ) : (
-        <Paper sx={{ borderRadius: '16px', overflowX: 'auto', border: '1px solid #e2e8f0' }}>
+        <Paper sx={{ borderRadius: '16px', overflowX: 'auto', border: '1px solid', borderColor: 'divider' }}>
           <Table>
             <TableHead>
-              <TableRow sx={{ bgcolor: '#f1f5f9' }}>
+              <TableRow sx={{ bgcolor: 'action.hover' }}>
                 {['Subject', 'Section', 'Day / Time', 'Date Cancelled', 'Actions'].map((header) => (
                   <TableCell key={header} sx={{ fontWeight: 'bold', whiteSpace: 'nowrap' }}>{header}</TableCell>
                 ))}
@@ -102,7 +102,7 @@ export default function InstructorRecentlyDeleted() {
             <TableBody>
               {deleted.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} align="center" sx={{ py: 6, color: '#94a3b8' }}>
+                  <TableCell colSpan={5} align="center" sx={{ py: 6, color: 'text.disabled' }}>
                     No recently cancelled requests.
                   </TableCell>
                 </TableRow>

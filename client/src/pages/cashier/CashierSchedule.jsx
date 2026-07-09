@@ -78,7 +78,7 @@ export default function CashierSchedule() {
   return (
     <Box sx={{ maxWidth: 1500, mx: 'auto' }}>
       <Toast toast={toast} onClose={hideToast} />
-      <Typography variant="h4" fontWeight="800" sx={{ mb: 0.5, color: '#1e293b' }}>View Schedule</Typography>
+      <Typography variant="h4" fontWeight="800" sx={{ mb: 0.5, color: 'text.primary' }}>View Schedule</Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
         Read-only view of the current term's room schedule.
       </Typography>
@@ -89,7 +89,7 @@ export default function CashierSchedule() {
         </Tabs>
       </Paper>
 
-      <Paper sx={{ p: 2, borderRadius: '16px', overflowX: 'auto', border: '1px solid #e2e8f0' }}>
+      <Paper sx={{ p: 2, borderRadius: '16px', overflowX: 'auto', border: '1px solid', borderColor: 'divider' }}>
         {rooms.length === 0 ? (
           <Box sx={{ textAlign: 'center', py: 6 }}>
             <Typography color="text.secondary">No rooms found.</Typography>
@@ -104,7 +104,7 @@ export default function CashierSchedule() {
             <Box />
             {TIME_SLOTS.map((t) => (
               <Box key={t} sx={{ textAlign: 'center', pb: 0.5 }}>
-                <Typography variant="caption" fontWeight="700" color="#475569">{formatTime(t)}</Typography>
+                <Typography variant="caption" fontWeight="700" color="text.secondary">{formatTime(t)}</Typography>
               </Box>
             ))}
 
@@ -118,7 +118,7 @@ export default function CashierSchedule() {
 
               return (
                 <React.Fragment key={room.id}>
-                  <Box sx={{ gridColumn: 1, gridRow, display: 'flex', flexDirection: 'column', justifyContent: 'center', pr: 1.5, borderRight: '2px solid #e2e8f0' }}>
+                  <Box sx={{ gridColumn: 1, gridRow, display: 'flex', flexDirection: 'column', justifyContent: 'center', pr: 1.5, borderRight: '2px solid', borderColor: 'divider' }}>
                     <Typography variant="body2" fontWeight="700" noWrap>{room.name}</Typography>
                     <Typography variant="caption" color="text.secondary">Cap: {room.capacity}</Typography>
                   </Box>
@@ -135,7 +135,7 @@ export default function CashierSchedule() {
                         sx={{
                           gridColumn: `${colStart} / span ${span}`, gridRow,
                           minHeight: 56, borderRadius: '8px',
-                          border: '2px dashed', borderColor: occupied ? '#fca5a5' : '#e2e8f0',
+                          border: '2px dashed', borderColor: occupied ? '#fca5a5' : 'divider',
                           bgcolor: occupied ? '#fee2e2' : '#f8fafc',
                           display: 'flex', alignItems: 'center', justifyContent: 'center', p: 0.75,
                         }}

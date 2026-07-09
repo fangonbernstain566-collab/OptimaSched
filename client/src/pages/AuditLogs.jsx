@@ -39,7 +39,7 @@ const StatCard = ({ title, value, icon, badgeColor, caption }) => (
     sx={{
       p: 3,
       borderRadius: '20px',
-      border: '1px solid #e2e8f0',
+      border: '1px solid', borderColor: 'divider',
       boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.02)',
       display: 'flex',
       flexDirection: 'column',
@@ -50,7 +50,7 @@ const StatCard = ({ title, value, icon, badgeColor, caption }) => (
     }}
   >
     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-      <Typography variant="body2" sx={{ color: '#64748b', fontWeight: 600 }}>
+      <Typography variant="body2" sx={{ color: 'text.secondary', fontWeight: 600 }}>
         {title}
       </Typography>
       <Box sx={{ p: 1, borderRadius: '12px', bgcolor: `${badgeColor}15`, color: badgeColor }}>
@@ -58,10 +58,10 @@ const StatCard = ({ title, value, icon, badgeColor, caption }) => (
       </Box>
     </Box>
     <Box sx={{ mt: 2 }}>
-      <Typography variant="h3" fontWeight="800" sx={{ color: '#1e293b', letterSpacing: '-1px' }}>
+      <Typography variant="h3" fontWeight="800" sx={{ color: 'text.primary', letterSpacing: '-1px' }}>
         {value}
       </Typography>
-      <Typography variant="caption" sx={{ color: '#94a3b8' }}>
+      <Typography variant="caption" sx={{ color: 'text.disabled' }}>
         {caption}
       </Typography>
     </Box>
@@ -180,7 +180,7 @@ export default function AuditLogs() {
   };
 
   return (
-    <Box sx={{ p: 4, minHeight: '100vh', bgcolor: '#f8fafc', mt: -4 }}>
+    <Box sx={{ p: 4, minHeight: '100vh', bgcolor: 'background.default', mt: -4 }}>
       <Box sx={{ maxWidth: '1500px', mx: 'auto' }}>
         <Stack
           direction={{ xs: 'column', md: 'row' }}
@@ -190,10 +190,10 @@ export default function AuditLogs() {
           spacing={2}
         >
           <Box>
-            <Typography variant="h4" sx={{ fontWeight: 800, color: '#1e293b' }}>
+            <Typography variant="h4" sx={{ fontWeight: 800, color: 'text.primary' }}>
               Audit Logs
             </Typography>
-            <Typography variant="body2" sx={{ color: '#64748b', mt: 0.5 }}>
+            <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>
               Monitor user actions and sensitive system changes.
             </Typography>
           </Box>
@@ -263,7 +263,7 @@ export default function AuditLogs() {
           </Grid>
         </Grid>
 
-        <Paper sx={{ p: 2.5, mb: 3, borderRadius: '16px', border: '1px solid #e2e8f0' }}>
+        <Paper sx={{ p: 2.5, mb: 3, borderRadius: '16px', border: '1px solid', borderColor: 'divider' }}>
           <AuditLogFilters
             filters={filters}
             onChange={handleFilterChange}

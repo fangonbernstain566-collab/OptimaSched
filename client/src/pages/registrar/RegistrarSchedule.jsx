@@ -57,11 +57,11 @@ const getRoomOccupancy = (schedules, roomId, day) => {
 };
 
 const StatCard = ({ label, value, icon, iconBg }) => (
-  <Paper sx={{ p: 2.5, borderRadius: '16px', border: '1px solid #e2e8f0', height: '100%' }}>
+  <Paper sx={{ p: 2.5, borderRadius: '16px', border: '1px solid', borderColor: 'divider', height: '100%' }}>
     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
       <Box>
-        <Typography variant="body2" sx={{ color: '#64748b', fontWeight: 600 }}>{label}</Typography>
-        <Typography variant="h4" fontWeight="800" sx={{ color: '#1e293b', mt: 0.5 }}>{value}</Typography>
+        <Typography variant="body2" sx={{ color: 'text.secondary', fontWeight: 600 }}>{label}</Typography>
+        <Typography variant="h4" fontWeight="800" sx={{ color: 'text.primary', mt: 0.5 }}>{value}</Typography>
       </Box>
       <Box sx={{ width: 40, height: 40, borderRadius: '50%', bgcolor: iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
         {icon}
@@ -127,7 +127,7 @@ export default function RegistrarSchedule() {
   return (
     <Box sx={{ maxWidth: 1500, mx: 'auto' }}>
       <Toast toast={toast} onClose={hideToast} />
-      <Typography variant="h4" fontWeight="800" sx={{ mb: 0.5, color: '#1e293b' }}>View Schedule</Typography>
+      <Typography variant="h4" fontWeight="800" sx={{ mb: 0.5, color: 'text.primary' }}>View Schedule</Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
         Filterable read-only view of the current term's room schedule.
       </Typography>
@@ -160,7 +160,7 @@ export default function RegistrarSchedule() {
         </Tabs>
       </Paper>
 
-      <Paper sx={{ p: 2, borderRadius: '16px', overflowX: 'auto', border: '1px solid #e2e8f0' }}>
+      <Paper sx={{ p: 2, borderRadius: '16px', overflowX: 'auto', border: '1px solid', borderColor: 'divider' }}>
         {rooms.length === 0 ? (
           <Box sx={{ textAlign: 'center', py: 6 }}>
             <Typography color="text.secondary">No rooms found.</Typography>
@@ -175,7 +175,7 @@ export default function RegistrarSchedule() {
             <Box />
             {TIME_SLOTS.map((t) => (
               <Box key={t} sx={{ textAlign: 'center', pb: 0.5 }}>
-                <Typography variant="caption" fontWeight="700" color="#475569">{formatTime(t)}</Typography>
+                <Typography variant="caption" fontWeight="700" color="text.secondary">{formatTime(t)}</Typography>
               </Box>
             ))}
 
@@ -189,7 +189,7 @@ export default function RegistrarSchedule() {
 
               return (
                 <React.Fragment key={room.id}>
-                  <Box sx={{ gridColumn: 1, gridRow, display: 'flex', flexDirection: 'column', justifyContent: 'center', pr: 1.5, borderRight: '2px solid #e2e8f0' }}>
+                  <Box sx={{ gridColumn: 1, gridRow, display: 'flex', flexDirection: 'column', justifyContent: 'center', pr: 1.5, borderRight: '2px solid', borderColor: 'divider' }}>
                     <Typography variant="body2" fontWeight="700" noWrap>{room.name}</Typography>
                     <Typography variant="caption" color="text.secondary">Cap: {room.capacity}</Typography>
                   </Box>
@@ -206,7 +206,7 @@ export default function RegistrarSchedule() {
                         sx={{
                           gridColumn: `${colStart} / span ${span}`, gridRow,
                           minHeight: 56, borderRadius: '8px',
-                          border: '2px dashed', borderColor: occupied ? '#93c5fd' : '#e2e8f0',
+                          border: '2px dashed', borderColor: occupied ? '#93c5fd' : 'divider',
                           bgcolor: occupied ? '#dbeafe' : '#f8fafc',
                           display: 'flex', alignItems: 'center', justifyContent: 'center', p: 0.75,
                         }}

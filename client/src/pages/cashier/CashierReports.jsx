@@ -48,12 +48,12 @@ export default function CashierReports() {
   return (
     <Box sx={{ maxWidth: 1400, mx: 'auto' }}>
       <Toast toast={toast} onClose={hideToast} />
-      <Typography variant="h4" fontWeight="800" sx={{ mb: 0.5, color: '#1e293b' }}>Reports</Typography>
+      <Typography variant="h4" fontWeight="800" sx={{ mb: 0.5, color: 'text.primary' }}>Reports</Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
         Year-to-date collections summary.
       </Typography>
 
-      <Paper sx={{ p: 3, borderRadius: '16px', border: '1px solid #e2e8f0', mb: 3 }}>
+      <Paper sx={{ p: 3, borderRadius: '16px', border: '1px solid', borderColor: 'divider', mb: 3 }}>
         <Grid container spacing={3}>
           <Grid item xs={6} sm={3}><SummaryTile label="Year-to-date" value={fmt(yearTotal)} /></Grid>
           <Grid item xs={6} sm={3}><SummaryTile label="Today" value={fmt(stats.todayCollected)} /></Grid>
@@ -64,7 +64,7 @@ export default function CashierReports() {
 
       <Grid container spacing={2.5}>
         <Grid item xs={12} md={7}>
-          <Paper sx={{ p: 3, borderRadius: '16px', border: '1px solid #e2e8f0' }}>
+          <Paper sx={{ p: 3, borderRadius: '16px', border: '1px solid', borderColor: 'divider' }}>
             <Typography variant="subtitle1" fontWeight="700" sx={{ mb: 2 }}>Monthly Collections ({new Date().getFullYear()})</Typography>
             <ResponsiveContainer width="100%" height={260}>
               <BarChart data={stats.monthly} barSize={28}>
@@ -78,7 +78,7 @@ export default function CashierReports() {
           </Paper>
         </Grid>
         <Grid item xs={12} md={5}>
-          <Paper sx={{ p: 3, borderRadius: '16px', border: '1px solid #e2e8f0' }}>
+          <Paper sx={{ p: 3, borderRadius: '16px', border: '1px solid', borderColor: 'divider' }}>
             <Typography variant="subtitle1" fontWeight="700" sx={{ mb: 2 }}>Payment Method Breakdown</Typography>
             {stats.byMethod.length === 0 ? (
               <Box sx={{ py: 6, textAlign: 'center' }}>

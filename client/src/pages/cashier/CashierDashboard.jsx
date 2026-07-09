@@ -46,16 +46,16 @@ const STATUS_COLORS = { PENDING: 'warning', CONFIRMED: 'success', CANCELLED: 'de
 const PIE_COLORS = ['#1e2d6e', '#c9a227', '#6366f1', '#ec4899', '#10b981', '#f97316'];
 
 const StatCard = ({ label, value, sub, icon, iconBg, iconColor }) => (
-  <Paper sx={{ p: 2.5, borderRadius: '16px', border: '1px solid #e2e8f0', height: '100%' }}>
+  <Paper sx={{ p: 2.5, borderRadius: '16px', border: '1px solid', borderColor: 'divider', height: '100%' }}>
     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1.5 }}>
-      <Typography variant="body2" sx={{ color: '#64748b', fontWeight: 600, maxWidth: '70%' }}>{label}</Typography>
+      <Typography variant="body2" sx={{ color: 'text.secondary', fontWeight: 600, maxWidth: '70%' }}>{label}</Typography>
       <Box sx={{ width: 40, height: 40, borderRadius: '50%', bgcolor: iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
         {icon}
       </Box>
     </Box>
-    <Typography variant="h4" fontWeight="800" sx={{ color: '#1e293b' }}>{value}</Typography>
+    <Typography variant="h4" fontWeight="800" sx={{ color: 'text.primary' }}>{value}</Typography>
     {sub && (
-      <Chip label={sub} size="small" sx={{ mt: 1, bgcolor: '#f1f5f9', color: '#475569', fontWeight: 600, fontSize: '0.7rem' }} />
+      <Chip label={sub} size="small" sx={{ mt: 1, bgcolor: 'action.hover', color: 'text.secondary', fontWeight: 600, fontSize: '0.7rem' }} />
     )}
   </Paper>
 );
@@ -195,7 +195,7 @@ export default function CashierDashboard() {
       <Toast toast={toast} onClose={hideToast} />
 
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4" fontWeight="800" sx={{ color: '#1e293b' }}>Payment Dashboard</Typography>
+        <Typography variant="h4" fontWeight="800" sx={{ color: 'text.primary' }}>Payment Dashboard</Typography>
         <Button
           variant="contained" startIcon={<AddIcon />}
           onClick={() => setModalOpen(true)}
@@ -222,7 +222,7 @@ export default function CashierDashboard() {
 
       <Grid container spacing={2.5} sx={{ mb: 3 }}>
         <Grid item xs={12} md={6}>
-          <Paper sx={{ p: 3, borderRadius: '16px', border: '1px solid #e2e8f0' }}>
+          <Paper sx={{ p: 3, borderRadius: '16px', border: '1px solid', borderColor: 'divider' }}>
             <Typography variant="subtitle1" fontWeight="700" sx={{ mb: 2 }}>Weekly Collections</Typography>
             <ResponsiveContainer width="100%" height={200}>
               <BarChart data={stats.weekly} barSize={28}>
@@ -236,7 +236,7 @@ export default function CashierDashboard() {
           </Paper>
         </Grid>
         <Grid item xs={12} md={6}>
-          <Paper sx={{ p: 3, borderRadius: '16px', border: '1px solid #e2e8f0' }}>
+          <Paper sx={{ p: 3, borderRadius: '16px', border: '1px solid', borderColor: 'divider' }}>
             <Typography variant="subtitle1" fontWeight="700" sx={{ mb: 2 }}>Payment Type Breakdown</Typography>
             {stats.byType.length === 0 ? (
               <Box sx={{ py: 6, textAlign: 'center' }}>
@@ -257,7 +257,7 @@ export default function CashierDashboard() {
         </Grid>
       </Grid>
 
-      <Paper sx={{ p: 3, borderRadius: '16px', border: '1px solid #e2e8f0' }}>
+      <Paper sx={{ p: 3, borderRadius: '16px', border: '1px solid', borderColor: 'divider' }}>
         <Typography variant="subtitle1" fontWeight="700" sx={{ mb: 2 }}>Recent Transactions</Typography>
         {transactions.length === 0 ? (
           <Typography variant="body2" color="text.secondary" sx={{ py: 4, textAlign: 'center' }}>
@@ -269,7 +269,7 @@ export default function CashierDashboard() {
               <TableHead>
                 <TableRow>
                   {['Student', 'Student ID', 'Amount', 'Type', 'Method', 'Status', 'Recorded', ''].map((h) => (
-                    <TableCell key={h} sx={{ fontWeight: 700, fontSize: '0.7rem', textTransform: 'uppercase', color: '#64748b' }}>{h}</TableCell>
+                    <TableCell key={h} sx={{ fontWeight: 700, fontSize: '0.7rem', textTransform: 'uppercase', color: 'text.secondary' }}>{h}</TableCell>
                   ))}
                 </TableRow>
               </TableHead>

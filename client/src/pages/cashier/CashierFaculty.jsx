@@ -31,18 +31,18 @@ export default function CashierFaculty() {
   return (
     <Box sx={{ maxWidth: 1200, mx: 'auto' }}>
       <Toast toast={toast} onClose={hideToast} />
-      <Typography variant="h4" fontWeight="800" sx={{ mb: 0.5, color: '#1e293b' }}>Manage Faculty</Typography>
+      <Typography variant="h4" fontWeight="800" sx={{ mb: 0.5, color: 'text.primary' }}>Manage Faculty</Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
         Read-only directory of registered instructors.
       </Typography>
 
-      <Paper sx={{ borderRadius: '16px', border: '1px solid #e2e8f0' }}>
+      <Paper sx={{ borderRadius: '16px', border: '1px solid', borderColor: 'divider' }}>
         <TableContainer>
           <Table>
             <TableHead>
               <TableRow>
                 {['Name', 'Email', 'Department', 'Max Load', 'Registered'].map((h) => (
-                  <TableCell key={h} sx={{ fontWeight: 700, fontSize: '0.7rem', textTransform: 'uppercase', color: '#64748b' }}>{h}</TableCell>
+                  <TableCell key={h} sx={{ fontWeight: 700, fontSize: '0.7rem', textTransform: 'uppercase', color: 'text.secondary' }}>{h}</TableCell>
                 ))}
               </TableRow>
             </TableHead>
@@ -59,7 +59,7 @@ export default function CashierFaculty() {
                     <TableCell sx={{ fontWeight: 600 }}>{t.user?.firstName} {t.user?.lastName}</TableCell>
                     <TableCell>{t.user?.email}</TableCell>
                     <TableCell>
-                      <Chip label={t.department?.name ?? '—'} size="small" sx={{ bgcolor: '#f1f5f9' }} />
+                      <Chip label={t.department?.name ?? '—'} size="small" sx={{ bgcolor: 'action.hover' }} />
                     </TableCell>
                     <TableCell>{t.maxTeachingLoad} units</TableCell>
                     <TableCell>{t.user?.createdAt ? new Date(t.user.createdAt).toLocaleDateString() : '—'}</TableCell>

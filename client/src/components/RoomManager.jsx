@@ -178,7 +178,7 @@ export default function RoomManager() {
         }}
       >
         <Box>
-          <Typography variant="h4" fontWeight={700} sx={{ color: '#1e293b' }}>
+          <Typography variant="h4" fontWeight={700} sx={{ color: 'text.primary' }}>
             Manage Rooms
           </Typography>
           <Typography color="text.secondary">

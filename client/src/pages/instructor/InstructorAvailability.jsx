@@ -80,14 +80,14 @@ export default function InstructorAvailability() {
       <Toast toast={toast} onClose={hideToast} />
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
         <AvailIcon sx={{ color: '#1B2B5E' }} />
-        <Typography variant="h4" fontWeight="800" sx={{ color: '#1e293b' }}>My Availability</Typography>
+        <Typography variant="h4" fontWeight="800" sx={{ color: 'text.primary' }}>My Availability</Typography>
       </Box>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
         Declare the days/times you're available to teach. Timmy uses this to avoid recommending
         slots outside your declared windows — leave a day empty and it's treated as fully open.
       </Typography>
 
-      <Paper sx={{ p: 3, borderRadius: '16px', border: '1px solid #e2e8f0', mb: 3 }}>
+      <Paper sx={{ p: 3, borderRadius: '16px', border: '1px solid', borderColor: 'divider', mb: 3 }}>
         <Typography variant="subtitle1" fontWeight="700" sx={{ mb: 2 }}>Add a window</Typography>
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ sm: 'center' }}>
           <FormControl size="small" sx={{ minWidth: 160 }}>
@@ -117,7 +117,7 @@ export default function InstructorAvailability() {
 
       <Stack spacing={2}>
         {byDay.map(({ day, windows }) => (
-          <Paper key={day} sx={{ p: 2.5, borderRadius: '16px', border: '1px solid #e2e8f0' }}>
+          <Paper key={day} sx={{ p: 2.5, borderRadius: '16px', border: '1px solid', borderColor: 'divider' }}>
             <Typography variant="body2" fontWeight="700" sx={{ mb: windows.length ? 1.5 : 0 }}>{day}</Typography>
             {windows.length === 0 ? (
               <Typography variant="caption" color="text.secondary">No declared windows — treated as fully open.</Typography>

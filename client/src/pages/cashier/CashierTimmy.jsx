@@ -17,9 +17,9 @@ const RANK_STYLES = {
 };
 
 const StatCard = ({ label, value, sub }) => (
-  <Paper sx={{ p: 2.5, borderRadius: '16px', border: '1px solid #e2e8f0', height: '100%' }}>
-    <Typography variant="body2" sx={{ color: '#64748b', fontWeight: 600 }}>{label}</Typography>
-    <Typography variant="h4" fontWeight="800" sx={{ color: '#1e293b', mt: 0.5 }}>{value}</Typography>
+  <Paper sx={{ p: 2.5, borderRadius: '16px', border: '1px solid', borderColor: 'divider', height: '100%' }}>
+    <Typography variant="body2" sx={{ color: 'text.secondary', fontWeight: 600 }}>{label}</Typography>
+    <Typography variant="h4" fontWeight="800" sx={{ color: 'text.primary', mt: 0.5 }}>{value}</Typography>
     {sub && <Typography variant="caption" color="text.secondary">{sub}</Typography>}
   </Paper>
 );
@@ -62,7 +62,7 @@ export default function CashierTimmy() {
       <Toast toast={toast} onClose={hideToast} />
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
         <TimmyIcon sx={{ color: '#6d28d9' }} />
-        <Typography variant="h4" fontWeight="800" sx={{ color: '#1e293b' }}>Ask Timmy</Typography>
+        <Typography variant="h4" fontWeight="800" sx={{ color: 'text.primary' }}>Ask Timmy</Typography>
       </Box>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
         Ranked follow-up priority for outstanding (pending) payments.
@@ -80,7 +80,7 @@ export default function CashierTimmy() {
         </Grid>
       </Grid>
 
-      <Paper sx={{ p: 3, borderRadius: '16px', border: '1px solid #e2e8f0' }}>
+      <Paper sx={{ p: 3, borderRadius: '16px', border: '1px solid', borderColor: 'divider' }}>
         <Typography variant="subtitle1" fontWeight="700" sx={{ mb: 2 }}>Top Follow-ups</Typography>
         {insights.topFollowUps.length === 0 ? (
           <Typography variant="body2" color="text.secondary" sx={{ py: 4, textAlign: 'center' }}>

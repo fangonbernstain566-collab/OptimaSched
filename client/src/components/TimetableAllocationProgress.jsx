@@ -5,8 +5,8 @@ import { Refresh as RefreshIcon } from '@mui/icons-material';
 
 const StatBlock = ({ label, value }) => (
   <Box>
-    <Typography variant="caption" sx={{ color: '#64748b', fontWeight: '600' }}>{label}</Typography>
-    <Typography variant="h6" fontWeight="800" sx={{ color: '#1e293b' }}>{value}</Typography>
+    <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: '600' }}>{label}</Typography>
+    <Typography variant="h6" fontWeight="800" sx={{ color: 'text.primary' }}>{value}</Typography>
   </Box>
 );
 
@@ -32,7 +32,8 @@ const TimetableAllocationProgress = () => {
     mt: 4,
     p: 4,
     borderRadius: '20px',
-    border: '1px solid #e2e8f0',
+    border: '1px solid',
+    borderColor: 'divider',
     boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.02)',
     bgcolor: 'background.paper',
   };
@@ -76,10 +77,10 @@ const TimetableAllocationProgress = () => {
   return (
     <Paper sx={cardSx}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', flexWrap: 'wrap', gap: 1 }}>
-        <Typography variant="h6" fontWeight="700" sx={{ color: '#334155' }}>
+        <Typography variant="h6" fontWeight="700" sx={{ color: 'text.secondary' }}>
           Timetable Allocation Progress
         </Typography>
-        <Typography variant="h4" fontWeight="800" sx={{ color: '#1e293b', letterSpacing: '-1px' }}>
+        <Typography variant="h4" fontWeight="800" sx={{ color: 'text.primary', letterSpacing: '-1px' }}>
           {progress}%
         </Typography>
       </Box>
@@ -91,7 +92,7 @@ const TimetableAllocationProgress = () => {
           mt: 2,
           height: 10,
           borderRadius: '20px',
-          bgcolor: '#f1f5f9',
+          bgcolor: 'action.hover',
           '& .MuiLinearProgress-bar': { borderRadius: '20px', bgcolor: '#2563eb' },
         }}
       />

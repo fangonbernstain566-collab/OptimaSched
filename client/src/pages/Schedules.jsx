@@ -467,7 +467,7 @@ const Schedules = () => {
 
   // ─── Render ───────────────────────────────────────────────────────────────
   return (
-    <Box sx={{ p: 4, minHeight: '100vh', bgcolor: '#f8fafc', mt: -4 }}>
+    <Box sx={{ p: 4, minHeight: '100vh', bgcolor: 'background.default', mt: -4 }}>
 
       <Toast toast={toast} onClose={hideToast} />
 
@@ -475,7 +475,7 @@ const Schedules = () => {
 
         {/* Header */}
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
-          <Typography variant="h4" fontWeight="800" sx={{ color: '#1e293b' }}>
+          <Typography variant="h4" fontWeight="800" sx={{ color: 'text.primary' }}>
             Manage Schedules
           </Typography>
           <Box sx={{ display: 'flex', gap: 1.25 }}>
@@ -501,13 +501,13 @@ const Schedules = () => {
         ) : (
           <>
             {/* Weekly Matrix */}
-            <Typography variant="h6" fontWeight="700" sx={{ mb: 1.5, color: '#334155' }}>
+            <Typography variant="h6" fontWeight="700" sx={{ mb: 1.5, color: 'text.secondary' }}>
               Weekly Overview
             </Typography>
             <Paper sx={{ p: 3, borderRadius: '16px', mb: 4, overflowX: 'auto' }}>
               <Table size="small">
                 <TableHead>
-                  <TableRow sx={{ bgcolor: '#f8fafc' }}>
+                  <TableRow sx={{ bgcolor: 'action.hover' }}>
                     <TableCell sx={{ fontWeight: 'bold' }}>Time</TableCell>
                     {DAYS.map((day) => (
                       <TableCell key={day} align="center" sx={{ fontWeight: 'bold' }}>{day}</TableCell>
@@ -517,7 +517,7 @@ const Schedules = () => {
                 <TableBody>
                   {TIME_SLOTS.map((time) => (
                     <TableRow key={time}>
-                      <TableCell sx={{ fontWeight: '600', color: '#64748b' }}>{time}</TableCell>
+                      <TableCell sx={{ fontWeight: '600', color: 'text.secondary' }}>{time}</TableCell>
                       {DAYS.map((day) => {
                         const match = getScheduleForSlot(day, time);
                         return (
@@ -543,13 +543,13 @@ const Schedules = () => {
             </Paper>
 
             {/* Records Table */}
-            <Typography variant="h6" fontWeight="700" sx={{ mb: 1.5, color: '#334155' }}>
+            <Typography variant="h6" fontWeight="700" sx={{ mb: 1.5, color: 'text.secondary' }}>
               Schedule Records ({schedules.length})
             </Typography>
             <Paper sx={{ borderRadius: '16px', overflowX: 'auto' }}>
               <Table>
                 <TableHead>
-                  <TableRow sx={{ bgcolor: '#f1f5f9' }}>
+                  <TableRow sx={{ bgcolor: 'action.hover' }}>
                     {['Class Code', 'Subject', 'Teacher', 'Room', 'Section', 'Students', 'Day', 'Time', 'School Year', 'Semester', 'Status', 'Actions'].map((h) => (
                       <TableCell key={h} sx={{ fontWeight: 'bold', whiteSpace: 'nowrap' }}>{h}</TableCell>
                     ))}
@@ -558,7 +558,7 @@ const Schedules = () => {
                 <TableBody>
                   {schedules.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={12} align="center" sx={{ py: 6, color: '#94a3b8' }}>
+                      <TableCell colSpan={12} align="center" sx={{ py: 6, color: 'text.disabled' }}>
                         No schedules yet. Click "Add New Schedule" to get started.
                       </TableCell>
                     </TableRow>

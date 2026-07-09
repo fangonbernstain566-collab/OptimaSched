@@ -110,7 +110,7 @@ export default function RegistrarTimmy() {
       <Toast toast={toast} onClose={hideToast} />
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
         <TimmyIcon sx={{ color: '#6d28d9' }} />
-        <Typography variant="h4" fontWeight="800" sx={{ color: '#1e293b' }}>Ask Timmy</Typography>
+        <Typography variant="h4" fontWeight="800" sx={{ color: 'text.primary' }}>Ask Timmy</Typography>
       </Box>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
         Pick a pending class and Timmy will suggest the top 3 conflict-free room + time combinations.
@@ -118,7 +118,7 @@ export default function RegistrarTimmy() {
 
       <Grid container spacing={3}>
         <Grid item xs={12} md={5}>
-          <Paper sx={{ p: 2.5, borderRadius: '16px', border: '1px solid #e2e8f0' }}>
+          <Paper sx={{ p: 2.5, borderRadius: '16px', border: '1px solid', borderColor: 'divider' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
               <PendingIcon sx={{ color: '#7c3aed', fontSize: 20 }} />
               <Typography variant="subtitle1" fontWeight="700">Pending Queue</Typography>
@@ -137,7 +137,7 @@ export default function RegistrarTimmy() {
                     variant="outlined"
                     sx={{
                       p: 1.75, borderRadius: '12px',
-                      borderColor: activeSchedule?.id === s.id ? '#6d28d9' : '#e2e8f0',
+                      borderColor: activeSchedule?.id === s.id ? '#6d28d9' : 'divider',
                       borderWidth: activeSchedule?.id === s.id ? 2 : 1,
                     }}
                   >
@@ -162,7 +162,7 @@ export default function RegistrarTimmy() {
         </Grid>
 
         <Grid item xs={12} md={7}>
-          <Paper sx={{ p: 2.5, borderRadius: '16px', border: '1px solid #e2e8f0', minHeight: 200 }}>
+          <Paper sx={{ p: 2.5, borderRadius: '16px', border: '1px solid', borderColor: 'divider', minHeight: 200 }}>
             {!result ? (
               <Box sx={{ py: 6, textAlign: 'center' }}>
                 <Typography variant="body2" color="text.secondary">
@@ -195,7 +195,7 @@ export default function RegistrarTimmy() {
                         <Paper key={`${rec.roomId}-${rec.day}-${rec.startTime}`} variant="outlined" sx={{ p: 2, borderRadius: '12px', borderColor: style.border }}>
                           <Chip label={style.label} size="small" sx={{ bgcolor: style.solid, color: '#fff', fontWeight: 700, mb: 1 }} />
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
-                            <RoomIcon sx={{ fontSize: 14, color: '#64748b' }} />
+                            <RoomIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
                             <Typography variant="body2" fontWeight="700">{rec.roomName}</Typography>
                           </Box>
                           <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>

@@ -31,7 +31,7 @@ export default function AuditLogTable({
       <TableContainer sx={{ overflowX: 'auto' }}>
         <Table>
           <TableHead>
-            <TableRow sx={{ bgcolor: '#f1f5f9' }}>
+            <TableRow sx={{ bgcolor: 'action.hover' }}>
               {['Date & Time', 'User', 'Role', 'Module', 'Action', 'Description', 'Target', 'IP Address'].map((h) => (
                 <TableCell key={h} sx={{ fontWeight: 'bold', whiteSpace: 'nowrap' }}>
                   {h}
@@ -43,7 +43,7 @@ export default function AuditLogTable({
           <TableBody>
             {rows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} align="center" sx={{ py: 6, color: '#94a3b8' }}>
+                <TableCell colSpan={8} align="center" sx={{ py: 6, color: 'text.disabled' }}>
                   No audit logs found for the selected filters.
                 </TableCell>
               </TableRow>

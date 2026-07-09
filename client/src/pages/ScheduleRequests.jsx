@@ -136,7 +136,7 @@ export default function ScheduleRequests() {
   return (
     <Box sx={{ maxWidth: 1300, mx: 'auto' }}>
       <Toast toast={toast} onClose={hideToast} />
-      <Typography variant="h4" fontWeight="800" sx={{ mb: 0.5, color: '#1e293b' }}>Schedule Requests</Typography>
+      <Typography variant="h4" fontWeight="800" sx={{ mb: 0.5, color: 'text.primary' }}>Schedule Requests</Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
         Review instructor-submitted schedule requests. Approving assigns a room and places a real class.
       </Typography>
@@ -153,7 +153,7 @@ export default function ScheduleRequests() {
         </FormControl>
       </Box>
 
-      <Paper sx={{ borderRadius: '16px', border: '1px solid #e2e8f0' }}>
+      <Paper sx={{ borderRadius: '16px', border: '1px solid', borderColor: 'divider' }}>
         {loading ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
             <CircularProgress />
@@ -164,7 +164,7 @@ export default function ScheduleRequests() {
               <TableHead>
                 <TableRow>
                   {['Instructor', 'Subject', 'Section', 'Day / Time', 'Preferred Room', 'Students', 'Status', ''].map((h) => (
-                    <TableCell key={h} sx={{ fontWeight: 700, fontSize: '0.7rem', textTransform: 'uppercase', color: '#64748b' }}>{h}</TableCell>
+                    <TableCell key={h} sx={{ fontWeight: 700, fontSize: '0.7rem', textTransform: 'uppercase', color: 'text.secondary' }}>{h}</TableCell>
                   ))}
                 </TableRow>
               </TableHead>

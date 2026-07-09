@@ -15,11 +15,11 @@ import { useToast } from '../../hooks/useToast';
 import Toast from '../../components/Toast';
 
 const StatCard = ({ label, value, icon, iconBg }) => (
-  <Paper sx={{ p: 2.5, borderRadius: '16px', border: '1px solid #e2e8f0', height: '100%' }}>
+  <Paper sx={{ p: 2.5, borderRadius: '16px', border: '1px solid', borderColor: 'divider', height: '100%' }}>
     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
       <Box>
-        <Typography variant="body2" sx={{ color: '#64748b', fontWeight: 600 }}>{label}</Typography>
-        <Typography variant="h4" fontWeight="800" sx={{ color: '#1e293b', mt: 0.5 }}>{value}</Typography>
+        <Typography variant="body2" sx={{ color: 'text.secondary', fontWeight: 600 }}>{label}</Typography>
+        <Typography variant="h4" fontWeight="800" sx={{ color: 'text.primary', mt: 0.5 }}>{value}</Typography>
       </Box>
       <Box sx={{ width: 40, height: 40, borderRadius: '50%', bgcolor: iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
         {icon}
@@ -92,7 +92,7 @@ export default function RegistrarClassList() {
   return (
     <Box sx={{ maxWidth: 1400, mx: 'auto' }}>
       <Toast toast={toast} onClose={hideToast} />
-      <Typography variant="h4" fontWeight="800" sx={{ mb: 0.5, color: '#1e293b' }}>Manage Class List</Typography>
+      <Typography variant="h4" fontWeight="800" sx={{ mb: 0.5, color: 'text.primary' }}>Manage Class List</Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
         Real enrolled-student rosters from placed classes.
       </Typography>
@@ -109,7 +109,7 @@ export default function RegistrarClassList() {
         </Grid>
       </Grid>
 
-      <Paper sx={{ p: 3, borderRadius: '16px', border: '1px solid #e2e8f0' }}>
+      <Paper sx={{ p: 3, borderRadius: '16px', border: '1px solid', borderColor: 'divider' }}>
         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mb: 3 }}>
           <TextField
             size="small" placeholder="Search student name…"
@@ -138,7 +138,7 @@ export default function RegistrarClassList() {
             <TableHead>
               <TableRow>
                 {['Student', 'Course', 'Year Level', 'Section', 'Subject', 'Instructor'].map((h) => (
-                  <TableCell key={h} sx={{ fontWeight: 700, fontSize: '0.7rem', textTransform: 'uppercase', color: '#64748b' }}>{h}</TableCell>
+                  <TableCell key={h} sx={{ fontWeight: 700, fontSize: '0.7rem', textTransform: 'uppercase', color: 'text.secondary' }}>{h}</TableCell>
                 ))}
               </TableRow>
             </TableHead>
@@ -163,7 +163,7 @@ export default function RegistrarClassList() {
                     <TableCell>{r.course}</TableCell>
                     <TableCell>{r.yearLevel ? `${r.yearLevel}${['th', 'st', 'nd', 'rd'][r.yearLevel % 10 > 3 ? 0 : r.yearLevel % 10] ?? 'th'} Year` : '—'}</TableCell>
                     <TableCell>
-                      <Chip label={r.section} size="small" sx={{ bgcolor: '#f1f5f9' }} />
+                      <Chip label={r.section} size="small" sx={{ bgcolor: 'action.hover' }} />
                     </TableCell>
                     <TableCell>
                       <Chip label={`${r.classCode} · ${r.subject}`} size="small" sx={{ bgcolor: '#eff6ff', color: '#1d4ed8', fontSize: '0.7rem' }} />
