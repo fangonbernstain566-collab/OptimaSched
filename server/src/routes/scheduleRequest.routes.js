@@ -58,7 +58,7 @@ router.get('/mine/recently-deleted', authorize('INSTRUCTOR'), async (req, res) =
   }
 });
 
-// ─── POST /: Submit a new schedule request ───────────────────────────────────
+// ─── POST /: Submit a new schedule request with strict validation ────────────
 router.post('/', authorize('INSTRUCTOR'), async (req, res) => {
   try {
     const { subjectOfferingId, sectionId, roomId, dayOfWeek, startTime, endTime, studentCount, notes } = req.body;
@@ -74,11 +74,48 @@ router.post('/', authorize('INSTRUCTOR'), async (req, res) => {
       return res.status(404).json({ success: false, message: 'No teacher profile found for this account.' });
     }
 
+    // Fetch active timeline configs
+    const [activeYear, currentSemester] = await Promise.all([
+      prisma.schoolYear.findFirst({ where: { isCurrent: true } }),
+      prisma.semester.findFirst({ where: { isCurrent: true } }),
+    ]);
+
+    if (!activeYear || !currentSemester) {
+      return res.status(400).json({
+        success: false,
+        message: 'System configuration error: An active School Year and Semester must be set before submitting requests.',
+      });
+    }
+
+    // 🌟 NEW: Compile the data payload for the conflict validation service
+    const proposedData = {
+      teacherId: teacher.id,
+      roomId: roomId || null, // Might be null if the teacher doesn't pre-select a room
+      sectionId,
+      subjectOfferingId,
+      schoolYearId: activeYear.id,
+      semesterId: currentSemester.id,
+      dayOfWeek,
+      startTime,
+      endTime,
+    };
+
+    // 🌟 NEW: Validate constraints immediately (Room constraints, capabilities, and schedule conflicts)
+    try {
+      await ScheduleConflictService.validateSchedule(proposedData);
+    } catch (conflictError) {
+      // ❌ Blocks submission and sends the specific reason directly back to the teacher's UI
+      return res.status(409).json({ success: false, message: conflictError.message });
+    }
+
+    // If validation passes, proceed with creating the request block
     const created = await prisma.scheduleRequest.create({
       data: {
         teacherId: teacher.id,
         subjectOfferingId,
         sectionId,
+        schoolYearId: activeYear.id,
+        semesterId: currentSemester.id,
         roomId: roomId || null,
         dayOfWeek,
         startTime,

@@ -33,11 +33,8 @@ const ROOM_SORT_MAP = {
   createdAt: (order) => ({ createdAt: order }),
 };
 
-// GET /api/rooms
-// Fetch active rooms with their building info.
-// Pagination is opt-in via ?page= so existing unpaginated callers (e.g. the
-// Schedule Plotter and Manage Schedules dropdowns, which expect a full array)
-// keep working unchanged.
+// ─── GET /api/rooms ──────────────────────────────────────────────────────────
+// Fetch active rooms with dynamic fallback filtering for schedule selectors
 router.get('/', async (req, res) => {
   try {
     const where = { isDeleted: false };
@@ -47,16 +44,22 @@ router.get('/', async (req, res) => {
     };
     const defaultOrderBy = { name: 'asc' };
 
+    // Strict list of instructional areas
     const SCHEDULABLE_TYPES = ['LECTURE_ROOM', 'COMPUTER_LABORATORY', 'LABORATORY', 'AVR', 'SIMULATOR_ROOM'];
-    if (req.query.schedulable === 'true') {
+    
+    // 🌟 THE FIX: If the UI doesn't request pagination (like your modal's dropdown query),
+    // or if it explicitly sets schedulable=true, automatically filter out Clinics/Offices.
+    if (req.query.schedulable === 'true' || req.query.page === undefined) {
       where.type = { in: SCHEDULABLE_TYPES };
     }
 
+    // Unpaginated path (Exactly what your Request Schedule modal uses to fill the dropdown)
     if (req.query.page === undefined) {
       const rooms = await prisma.room.findMany({ where, include, orderBy: defaultOrderBy });
       return res.status(200).json({ success: true, data: rooms });
     }
 
+    // Paginated path (Used by Admin management tables where they DO need to see the Clinic/Offices)
     const page     = Math.max(parseInt(req.query.page, 10) || 1, 1);
     const pageSize = Math.min(Math.max(parseInt(req.query.pageSize, 10) || 10, 1), 100);
     const skip     = (page - 1) * pageSize;
@@ -82,7 +85,6 @@ router.get('/', async (req, res) => {
     });
   } catch (error) {
     console.error('❌ Error fetching rooms:', error);
-
     return res.status(500).json({
       success: false,
       message: 'Failed to fetch rooms.',

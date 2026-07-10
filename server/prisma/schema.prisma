@@ -5,7 +5,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  
+  url      = env("DATABASE_URL")
 }
 
 model Role {
@@ -15,21 +15,21 @@ model Role {
 }
 
 model User {
-  id           String        @id @default(uuid())
-  email        String        @unique
-  passwordHash String
-  firstName    String
-  lastName     String
-  roleId       String
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  auditLogs    AuditLog[]
-  teacher      Teacher?
-  settings     UserSettings?
-  payments     Payment[]
+  id               String            @id @default(uuid())
+  email            String            @unique
+  passwordHash     String
+  firstName        String
+  lastName         String
+  roleId           String
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  auditLogs        AuditLog[]
+  teacher          Teacher?
+  settings         UserSettings?
+  payments         Payment[]
   reviewedRequests ScheduleRequest[]
-  notifications Notification[]
-  role         Role          @relation(fields: [roleId], references: [id])
+  notifications    Notification[]
+  role             Role              @relation(fields: [roleId], references: [id])
 }
 
 model Payment {
@@ -54,11 +54,9 @@ model Payment {
 }
 
 model UserSettings {
-  id     String @id @default(uuid())
-  userId String @unique
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  // Accessibility
+  id            String    @id @default(uuid())
+  userId        String    @unique
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   themeMode     ThemeMode @default(LIGHT)
   fontSize      FontSize  @default(MEDIUM)
   highContrast  Boolean   @default(false)
@@ -90,21 +88,24 @@ model Department {
 }
 
 model Teacher {
-  id              String         @id @default(uuid())
-  userId          String         @unique
-  departmentId    String
-  maxTeachingLoad Int            @default(21)
-  isDeleted       Boolean        @default(false)
-  deletedAt       DateTime?
-  availabilities  Availability[]
-  schedules       Schedule[]
-  scheduleRequests ScheduleRequest[]
-  department      Department     @relation(fields: [departmentId], references: [id])
-  user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                 String                     @id @default(uuid())
+  userId             String                     @unique
+  departmentId       String
+  maxTeachingLoad    Int                        @default(21)
+  isDeleted          Boolean                    @default(false)
+  deletedAt          DateTime?
+  availabilities     Availability[]
+  schedules          Schedule[]
+  scheduleRequests   ScheduleRequest[]
+  department         Department                 @relation(fields: [departmentId], references: [id])
+  user               User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Rule Evaluator Constraint Relation
+  subjectCapabilities TeacherSubjectCapability[]
 }
 
 model Availability {
-  id        String  @id @default(uuid())
+  id        String @id @default(uuid())
   teacherId String
   dayOfWeek String
   startTime String
@@ -119,50 +120,51 @@ model Building {
 }
 
 model Room {
-  id         String     @id @default(uuid())
-  name       String
-  capacity   Int
-  type       RoomType   @default(LECTURE_ROOM)
-  buildingId String
-  isDeleted  Boolean    @default(false)
-  deletedAt  DateTime?
-  createdAt  DateTime   @default(now())
-  building   Building   @relation(fields: [buildingId], references: [id], onDelete: Cascade)
-  schedules  Schedule[]
+  id               String            @id @default(uuid())
+  name             String
+  capacity         Int
+  type             RoomType          @default(LECTURE_ROOM)
+  buildingId       String
+  isDeleted        Boolean           @default(false)
+  deletedAt        DateTime?
+  createdAt        DateTime          @default(now())
+  building         Building          @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  schedules        Schedule[]
   scheduleRequests ScheduleRequest[]
 }
 
 model Subject {
-  id                 String              @id @default(uuid())
-  code               String              @unique
-  name               String
-  units              Int
-  isLabRequired      Boolean             @default(false)
-  offerings          SubjectOffering[]
+  id                  String                     @id @default(uuid())
+  code                String                     @unique
+  name                String
+  units               Int
+  isLabRequired       Boolean                    @default(false)
+  offerings           SubjectOffering[]
   curriculumSubjects CurriculumSubject[]
+  
+  // Rule Evaluator Constraint Relations
+  roomConstraints     SubjectRoomConstraint[]
+  teacherCapabilities TeacherSubjectCapability[]
 }
 
 model SubjectOffering {
-  id        String     @id @default(uuid())
-  subjectId String
-  classCode String     @unique
-  schedules Schedule[]
+  id               String            @id @default(uuid())
+  subjectId        String
+  classCode        String            @unique
+  schedules        Schedule[]
   scheduleRequests ScheduleRequest[]
-  subject   Subject    @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  subject          Subject           @relation(fields: [subjectId], references: [id], onDelete: Cascade)
 }
 
 model Section {
-  id        String     @id @default(uuid())
-  name      String     @unique
-  program   String
-  yearLevel Int
-  schedules Schedule[]
+  id               String            @id @default(uuid())
+  name             String            @unique
+  program          String
+  yearLevel        Int
+  schedules        Schedule[]
   scheduleRequests ScheduleRequest[]
 }
 
-// Maps which subjects belong to a given program + year level curriculum.
-// Kept separate from Subject because gen-ed subjects (e.g. NSTP, PE) are
-// shared across multiple programs/year levels, not exclusive to one.
 model CurriculumSubject {
   id        String  @id @default(uuid())
   program   String
@@ -174,11 +176,46 @@ model CurriculumSubject {
 }
 
 model SchoolYear {
-  id        String     @id @default(uuid())
-  name      String     @unique
-  isCurrent Boolean    @default(false)
-  schedules Schedule[]
+  id               String            @id @default(uuid())
+  name             String            @unique
+  isCurrent        Boolean           @default(false)
+  schedules        Schedule[]
+  scheduleRequests ScheduleRequest[]
 }
+
+model Semester {
+  id               String            @id @default(uuid())
+  name             String
+  isCurrent        Boolean           @default(false)
+  schedules        Schedule[]
+  scheduleRequests ScheduleRequest[]
+}
+
+// ─── CONSTRAINT MATRIX TABLES ──────────────────────────────────────────────────
+
+model SubjectRoomConstraint {
+  id        String   @id @default(uuid())
+  subjectId String
+  roomType  RoomType // Links directly to allowed RoomType configs (e.g. COMPUTER_LABORATORY, SIMULATOR_ROOM)
+  subject   Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  @@unique([subjectId, roomType])
+  @@index([subjectId])
+}
+
+model TeacherSubjectCapability {
+  id        String   @id @default(uuid())
+  teacherId String
+  subjectId String
+  teacher   Teacher  @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  subject   Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  @@unique([teacherId, subjectId])
+  @@index([teacherId])
+  @@index([subjectId])
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
 
 model AuditLog {
   id               String   @id @default(uuid())
@@ -204,13 +241,6 @@ model AuditLog {
   @@index([targetRecordId])
 }
 
-model Semester {
-  id        String     @id @default(uuid())
-  name      String
-  isCurrent Boolean    @default(false)
-  schedules Schedule[]
-}
-
 model Schedule {
   id                String          @id @default(uuid())
   teacherId         String
@@ -221,7 +251,7 @@ model Schedule {
   semesterId        String
   dayOfWeek         String
   startTime         String
-  enrolledStudents String[] @default([])
+  enrolledStudents  String[]        @default([])
   endTime           String
   studentCount      Int             @default(0)
   status            ScheduleStatus  @default(PENDING)
@@ -238,38 +268,37 @@ model Schedule {
 }
 
 model ScheduleRequest {
-  id                  String        @id @default(uuid())
+  id                  String          @id @default(uuid())
   teacherId           String
-  teacher             Teacher       @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  teacher             Teacher         @relation(fields: [teacherId], references: [id], onDelete: Cascade)
   subjectOfferingId   String
-  subjectOffering     SubjectOffering @relation(fields: [subjectOfferingId], references: [id])
+  subjectOffering     SubjectOffering @relation(fields: [subjectOfferingId], references: [id], onDelete: Cascade)
   sectionId           String
-  section             Section       @relation(fields: [sectionId], references: [id])
+  section             Section         @relation(fields: [sectionId], references: [id], onDelete: Cascade)
   roomId              String?
-  room                Room?         @relation(fields: [roomId], references: [id])
+  room                Room?           @relation(fields: [roomId], references: [id], onDelete: SetNull)
+  schoolYearId        String          
+  schoolYear          SchoolYear      @relation(fields: [schoolYearId], references: [id])
+  semesterId          String          
+  semester            Semester        @relation(fields: [semesterId], references: [id])
   dayOfWeek           String
   startTime           String
   endTime             String
-  studentCount        Int           @default(0)
+  studentCount        Int             @default(0)
   notes               String?
-  status              RequestStatus @default(PENDING)
+  status              RequestStatus   @default(PENDING)
   reviewedById        String?
-  reviewedBy          User?         @relation(fields: [reviewedById], references: [id])
+  reviewedBy          User?           @relation(fields: [reviewedById], references: [id], onDelete: SetNull)
   reviewNotes         String?
   resultingScheduleId String?
-  isDeleted           Boolean       @default(false)
+  isDeleted           Boolean         @default(false)
   deletedAt           DateTime?
-  createdAt           DateTime      @default(now())
-  updatedAt           DateTime      @updatedAt
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
 
   @@index([teacherId, status])
   @@index([status, createdAt])
-}
-
-enum RequestStatus {
-  PENDING
-  APPROVED
-  REJECTED
+  @@index([schoolYearId, semesterId])
 }
 
 model Notification {
@@ -285,6 +314,12 @@ model Notification {
 
   @@index([userId, isRead])
   @@index([userId, createdAt])
+}
+
+enum RequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
 }
 
 enum RoleName {

@@ -1,3 +1,4 @@
+// ─── server/services/scheduleConflict.service.js ─────────────────────────────
 import prisma from '../config/prisma.js';
 
 export class ScheduleConflictService {
@@ -12,21 +13,57 @@ export class ScheduleConflictService {
     } = proposedData;
 
     // 1. Fetch cross-entity prerequisites for validations
-    const room = await prisma.room.findUnique({ where: { id: roomId } });
+    // Handle cases where a room isn't pre-selected during a raw teacher request
+    const room = roomId ? await prisma.room.findUnique({ where: { id: roomId } }) : null;
+    
     const offering = await prisma.subjectOffering.findUnique({
       where: { id: subjectOfferingId },
       include: { subject: true }
     });
     const section = await prisma.section.findUnique({ where: { id: sectionId } });
 
-    if (!room || !offering || !section) {
+    // Room is only required if a roomId was actually provided in the request payload
+    if ((roomId && !room) || !offering || !section) {
       throw new Error("Invalid entity reference parameters provided.");
     }
 
-    // 2. Room Type Validation
-    if (offering.subject.isLabRequired && room.type === 'LECTURE_ROOM') {
-      throw new Error(`Subject requires laboratory environment. Room '${room.name}' is designated for Lectures.`);
+    // 🌟 6. Teacher Capability Matrix Check (Constraint 2)
+    // Verify if this specific teacher is certified to teach this subject
+    const capability = await prisma.teacherSubjectCapability.findUnique({
+      where: {
+        teacherId_subjectId: {
+          teacherId,
+          subjectId: offering.subjectId,
+        },
+      },
+    });
+
+    if (!capability) {
+      throw new Error("Teacher is not qualified/certified to teach this subject.");
     }
+
+    // 2. Room Type Validation (Only run if a room is attached)
+if (room) {
+  // 🅰️ Global Block: Prevent scheduling ANY class in non-instructional spaces
+  const VALID_INSTRUCTIONAL_TYPES = [
+    'LECTURE_ROOM',
+    'COMPUTER_LABORATORY',
+    'LABORATORY',
+    'AVR',
+    'SIMULATOR_ROOM'
+  ];
+
+  if (!VALID_INSTRUCTIONAL_TYPES.includes(room.type)) {
+    throw new Error(
+      `Invalid Location: Room '${room.name}' is a ${room.type.replace('_', ' ')} and cannot be used for instructional classes.`
+    );
+  }
+
+  // 🅱️ Specific Lab Check: If a lab environment is strictly requested
+  if (offering.subject.isLabRequired && room.type === 'LECTURE_ROOM') {
+    throw new Error(`Subject requires laboratory environment. Room '${room.name}' is designated for Lectures.`);
+  }
+}
 
     // 3. Teacher Availability Check
     const convertedProposedStart = this.timeToMinutes(startTime);
@@ -54,7 +91,7 @@ export class ScheduleConflictService {
       semesterId,
       dayOfWeek,
       id: ignoreScheduleId ? { not: ignoreScheduleId } : undefined,
-      status: { notIn: ['ARCHIVED'] }, // Only compare with active/draft paths
+      status: { notIn: ['ARCHIVED'] }, 
       isDeleted: false,
     };
 
@@ -63,7 +100,7 @@ export class ScheduleConflictService {
         ...baseConflictFilter,
         OR: [
           { teacherId },
-          { roomId },
+          ...(roomId ? [{ roomId }] : []), // Only check room conflict if a room is assigned
           { sectionId }
         ]
       },
@@ -78,12 +115,11 @@ export class ScheduleConflictService {
       const activeStart = this.timeToMinutes(activeSched.startTime);
       const activeEnd = this.timeToMinutes(activeSched.endTime);
 
-      // Overlap formula: StartA < EndB AND EndA > StartB
       if (convertedProposedStart < activeEnd && convertedProposedEnd > activeStart) {
         if (activeSched.teacherId === teacherId) {
           throw new Error(`Instructor conflict: ${activeSched.teacher.user.lastName} is assigned to Section ${activeSched.section.name} during this slot.`);
         }
-        if (activeSched.roomId === roomId) {
+        if (roomId && activeSched.roomId === roomId) {
           throw new Error(`Spatial bottleneck: Room ${activeSched.room.name} is currently booked.`);
         }
         if (activeSched.sectionId === sectionId) {
@@ -116,11 +152,6 @@ export class ScheduleConflictService {
     return { isValid: true };
   }
 
-  /**
-   * Maps 24h string expression to explicit integer scalar representing total minutes from midnight
-   * @param {string} timeStr - "HH:MM" format
-   * @returns {number}
-   */
   static timeToMinutes(timeStr) {
     const [hours, minutes] = timeStr.split(':').map(Number);
     return hours * 60 + minutes;
