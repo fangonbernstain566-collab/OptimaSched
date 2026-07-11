@@ -1,5 +1,6 @@
 // ─── server/services/scheduleConflict.service.js ─────────────────────────────
 import prisma from '../config/prisma.js';
+import { assertTeacherMeetsSubjectCredentials } from '../utils/credentialCheck.js';
 
 export class ScheduleConflictService {
   /**
@@ -42,6 +43,7 @@ export class ScheduleConflictService {
       throw new Error("Teacher is not qualified/certified to teach this subject.");
     }
 
+<<<<<<< HEAD
     // 2. Room Type Validation (Only run if a room is attached)
 if (room) {
   // 🅰️ Global Block: Prevent scheduling ANY class in non-instructional spaces
@@ -64,6 +66,10 @@ if (room) {
     throw new Error(`Subject requires laboratory environment. Room '${room.name}' is designated for Lectures.`);
   }
 }
+=======
+    // 2b. Teacher Credential Validation
+    await assertTeacherMeetsSubjectCredentials(teacherId, subjectOfferingId);
+>>>>>>> 5487d3a0458e1523ee452bbe1fc4deb545380070
 
     // 3. Teacher Availability Check
     const convertedProposedStart = this.timeToMinutes(startTime);

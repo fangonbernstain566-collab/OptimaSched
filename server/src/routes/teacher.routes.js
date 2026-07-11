@@ -7,6 +7,14 @@ import { logAudit } from '../utils/auditLog.js';
 const router = Router();
 router.use(authenticate); // ✅ makes req.user available below
 
+// Accepts either an array of strings or a comma-separated string from the UI
+// and normalizes it to a deduped, trimmed array of credential tags.
+const normalizeCredentials = (value) => {
+  if (value === undefined) return undefined;
+  const list = Array.isArray(value) ? value : String(value).split(',');
+  return [...new Set(list.map((c) => String(c).trim()).filter(Boolean))];
+};
+
 // Whitelist of columns the UI is allowed to sort by, mapped to the Prisma
 // orderBy shape needed to reach them (some live on the related User/Department).
 // Keeping this as an explicit map (rather than trusting req.query.sortBy
@@ -102,7 +110,7 @@ router.get('/recently-deleted', async (req, res) => {
 
 // ─── POST /: Register a new teacher ──────────────────────────────────────────
 router.post('/', async (req, res) => {
-  const { firstName, lastName, email, maxTeachingLoad, departmentName } = req.body;
+  const { firstName, lastName, email, maxTeachingLoad, departmentName, credentials } = req.body;
 
   try {
     if (!firstName || !lastName || !email || !departmentName) {
@@ -166,6 +174,7 @@ router.post('/', async (req, res) => {
         userId:          targetUser.id,
         departmentId:    targetDept.id,
         maxTeachingLoad: parseInt(maxTeachingLoad, 10) || 15,
+        credentials:     normalizeCredentials(credentials) ?? [],
       },
       include: { user: true, department: true },
     });
@@ -197,7 +206,7 @@ router.post('/', async (req, res) => {
 // ─── PUT /:id: Update a teacher's profile ────────────────────────────────────
 router.put('/:id', async (req, res) => {
   const { id } = req.params;
-  const { firstName, lastName, maxTeachingLoad, departmentName } = req.body;
+  const { firstName, lastName, maxTeachingLoad, departmentName, credentials } = req.body;
 
   try {
     const existingTeacher = await prisma.teacher.findUnique({
@@ -238,6 +247,8 @@ router.put('/:id', async (req, res) => {
       },
     });
 
+    const normalizedCredentials = normalizeCredentials(credentials);
+
     const updatedTeacher = await prisma.teacher.update({
       where: { id },
       data: {
@@ -245,6 +256,7 @@ router.put('/:id', async (req, res) => {
         maxTeachingLoad: maxTeachingLoad !== undefined
           ? parseInt(maxTeachingLoad, 10) || existingTeacher.maxTeachingLoad
           : existingTeacher.maxTeachingLoad,
+        ...(normalizedCredentials !== undefined && { credentials: normalizedCredentials }),
       },
       include: { user: true, department: true },
     });

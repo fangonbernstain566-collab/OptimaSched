@@ -88,19 +88,25 @@ model Department {
 }
 
 model Teacher {
-  id                 String                     @id @default(uuid())
-  userId             String                     @unique
-  departmentId       String
-  maxTeachingLoad    Int                        @default(21)
-  isDeleted          Boolean                    @default(false)
-  deletedAt          DateTime?
-  availabilities     Availability[]
-  schedules          Schedule[]
-  scheduleRequests   ScheduleRequest[]
-  department         Department                 @relation(fields: [departmentId], references: [id])
-  user               User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  // Rule Evaluator Constraint Relation
+  id                  String                     @id @default(uuid())
+  userId              String                     @unique
+  departmentId        String
+  maxTeachingLoad     Int                        @default(21)
+
+  // Credential tags (e.g. "Masters in IT", "LET Passer")
+  credentials         String[]                   @default([])
+
+  isDeleted           Boolean                    @default(false)
+  deletedAt           DateTime?
+
+  availabilities      Availability[]
+  schedules           Schedule[]
+  scheduleRequests    ScheduleRequest[]
+
+  department          Department                 @relation(fields: [departmentId], references: [id])
+  user                User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Rule Evaluator
   subjectCapabilities TeacherSubjectCapability[]
 }
 
@@ -134,17 +140,21 @@ model Room {
 }
 
 model Subject {
-  id                  String                     @id @default(uuid())
-  code                String                     @unique
-  name                String
-  units               Int
-  isLabRequired       Boolean                    @default(false)
-  offerings           SubjectOffering[]
-  curriculumSubjects CurriculumSubject[]
-  
-  // Rule Evaluator Constraint Relations
-  roomConstraints     SubjectRoomConstraint[]
-  teacherCapabilities TeacherSubjectCapability[]
+  id                   String                     @id @default(uuid())
+  code                 String                     @unique
+  name                 String
+  units                Int
+  isLabRequired        Boolean                    @default(false)
+
+  // Required credentials before a teacher can teach this subject
+  requiredCredentials  String[]                   @default([])
+
+  offerings            SubjectOffering[]
+  curriculumSubjects   CurriculumSubject[]
+
+  // Rule Evaluator
+  roomConstraints      SubjectRoomConstraint[]
+  teacherCapabilities  TeacherSubjectCapability[]
 }
 
 model SubjectOffering {

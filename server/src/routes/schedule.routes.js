@@ -3,6 +3,7 @@ import { Router } from 'express';
 import prisma from '../config/prisma.js';
 import { authenticate } from '../middleware/auth.js';
 import { logAudit } from '../utils/auditLog.js';
+import { assertTeacherMeetsSubjectCredentials } from '../utils/credentialCheck.js';
 import { z } from 'zod';
 
 const router = Router();
@@ -138,6 +139,12 @@ router.post('/', async (req, res) => {
       });
     }
 
+    try {
+      await assertTeacherMeetsSubjectCredentials(teacherId, subjectOfferingId);
+    } catch (credentialError) {
+      return res.status(400).json({ success: false, message: credentialError.message });
+    }
+
     // ✅ FIX: create happens FIRST, only once, before anything references it
     const newSchedule = await prisma.schedule.create({
       data: {
@@ -175,9 +182,17 @@ router.post('/', async (req, res) => {
 
 // ─── 5. POST /validate: Conflict check ───────────────────────────────────────
 router.post('/validate', async (req, res) => {
-  const { teacherId, roomId, sectionId, dayOfWeek, startTime, endTime } = req.body;
+  const { teacherId, roomId, sectionId, subjectOfferingId, dayOfWeek, startTime, endTime } = req.body;
 
   try {
+    if (subjectOfferingId) {
+      try {
+        await assertTeacherMeetsSubjectCredentials(teacherId, subjectOfferingId);
+      } catch (credentialError) {
+        return res.status(400).json({ success: false, message: credentialError.message });
+      }
+    }
+
     const conflictQuery = (field, id) => ({
       where: {
         [field]: id,
@@ -278,6 +293,12 @@ router.put('/:id', async (req, res) => {
 
     if (!existing || existing.isDeleted) {
       return res.status(404).json({ success: false, message: 'Schedule not found.' });
+    }
+
+    try {
+      await assertTeacherMeetsSubjectCredentials(teacherId, subjectOfferingId);
+    } catch (credentialError) {
+      return res.status(400).json({ success: false, message: credentialError.message });
     }
 
     const updated = await prisma.schedule.update({

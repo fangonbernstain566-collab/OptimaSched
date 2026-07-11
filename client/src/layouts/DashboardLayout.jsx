@@ -28,6 +28,7 @@ import {
   AutoAwesome      as TimmyIcon,
   EventAvailable   as AvailIcon,
   PendingActions   as RequestsIcon,
+  WorkspacePremium as CredentialIcon,
   ChevronLeft,   // ✅ FIX 3: added for collapse toggle button
   ChevronRight,  // ✅ FIX 3: added for collapse toggle button
   KeyboardArrowRight as CaretIcon,
@@ -128,6 +129,12 @@ const NAV_ITEMS = [
     text:  'Manage Rooms',
     path:  '/rooms',
     icon:  <RoomIcon fontSize="small" />,
+    roles: ['ADMINISTRATOR'],
+  },
+  {
+    text:  'Subject Requirements',
+    path:  '/subjects',
+    icon:  <CredentialIcon fontSize="small" />,
     roles: ['ADMINISTRATOR'],
   },
   {

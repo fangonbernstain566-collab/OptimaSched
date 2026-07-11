@@ -2,6 +2,7 @@ import { Router } from 'express';
 import prisma from '../config/prisma.js';
 import { authenticate, authorize } from '../middleware/auth.js';
 import { logAudit } from '../utils/auditLog.js';
+import { assertTeacherMeetsSubjectCredentials } from '../utils/credentialCheck.js';
 import { ScheduleConflictService } from '../services/scheduleConflict.service.js';
 import { NotificationService } from '../services/notification.service.js';
 
@@ -74,6 +75,7 @@ router.post('/', authorize('INSTRUCTOR'), async (req, res) => {
       return res.status(404).json({ success: false, message: 'No teacher profile found for this account.' });
     }
 
+<<<<<<< HEAD
     // Fetch active timeline configs
     const [activeYear, currentSemester] = await Promise.all([
       prisma.schoolYear.findFirst({ where: { isCurrent: true } }),
@@ -109,6 +111,14 @@ router.post('/', authorize('INSTRUCTOR'), async (req, res) => {
     }
 
     // If validation passes, proceed with creating the request block
+=======
+    try {
+      await assertTeacherMeetsSubjectCredentials(teacher.id, subjectOfferingId);
+    } catch (credentialError) {
+      return res.status(400).json({ success: false, message: credentialError.message });
+    }
+
+>>>>>>> 5487d3a0458e1523ee452bbe1fc4deb545380070
     const created = await prisma.scheduleRequest.create({
       data: {
         teacherId: teacher.id,

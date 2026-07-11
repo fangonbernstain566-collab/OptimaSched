@@ -28,6 +28,7 @@ const INITIAL_FORM = {
   email:           '',
   maxTeachingLoad: 15,
   departmentName:  'Information Technology Dept',
+  credentials:     '',
 };
 
 export default function TeacherManager() {
@@ -107,6 +108,7 @@ export default function TeacherManager() {
       email:           teacher.user?.email ?? '',
       maxTeachingLoad: teacher.maxTeachingLoad ?? 15,
       departmentName:  teacher.department?.name ?? '',
+      credentials:     (teacher.credentials ?? []).join(', '),
     });
     setOpen(true);
   };
@@ -213,6 +215,7 @@ export default function TeacherManager() {
                     <SortableTableCell label="Name" sortKey="lastName" sortBy={sort.sortBy} order={sort.order} onSort={handleSort} />
                     <SortableTableCell label="Academic Email Address" sortKey="email" sortBy={sort.sortBy} order={sort.order} onSort={handleSort} />
                     <SortableTableCell label="Assigned Department" sortKey="department" sortBy={sort.sortBy} order={sort.order} onSort={handleSort} />
+                    <TableCell sx={{ fontWeight: 'bold' }}>Credentials</TableCell>
                     <SortableTableCell label="Max Units Load" sortKey="maxTeachingLoad" sortBy={sort.sortBy} order={sort.order} onSort={handleSort} />
                     <SortableTableCell label="Date Registered" sortKey="createdAt" sortBy={sort.sortBy} order={sort.order} onSort={handleSort} />
                     <TableCell align="right" sx={{ fontWeight: 'bold' }}>Actions</TableCell>
@@ -221,7 +224,7 @@ export default function TeacherManager() {
                 <TableBody>
                   {teachers.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} align="center" sx={{ py: 6, color: 'text.disabled' }}>
+                      <TableCell colSpan={7} align="center" sx={{ py: 6, color: 'text.disabled' }}>
                         No active instructors registered in the database system yet.
                       </TableCell>
                     </TableRow>
@@ -233,6 +236,7 @@ export default function TeacherManager() {
                         </TableCell>
                         <TableCell>{t.user?.email}</TableCell>
                         <TableCell>{t.department?.name || 'General Education'}</TableCell>
+                        <TableCell>{(t.credentials ?? []).length > 0 ? t.credentials.join(', ') : '-'}</TableCell>
                         <TableCell>{t.maxTeachingLoad} Units</TableCell>
                         <TableCell>{formatDate(t.user?.createdAt)}</TableCell>
                         <TableCell align="right">
@@ -301,6 +305,12 @@ export default function TeacherManager() {
                   label="Max Teaching Unit Load" name="maxTeachingLoad" type="number" fullWidth required
                   value={formData.maxTeachingLoad} onChange={handleInputChange}
                   inputProps={{ min: 1 }}
+                />
+                <TextField
+                  label="Credentials" name="credentials" fullWidth
+                  value={formData.credentials} onChange={handleInputChange}
+                  placeholder="e.g. Masters in IT, LET Passer"
+                  helperText="Comma-separated. Must match a subject's required credential exactly to be assignable to it."
                 />
 
                 <Button fullWidth variant="contained" type="submit"
