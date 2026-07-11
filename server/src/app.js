@@ -10,6 +10,7 @@ import teacherRoutes from './routes/teacher.routes.js';
 import roomRoutes from './routes/room.routes.js'; // Import the room routes
 import auditLogRoutes from './routes/auditLog.routes.js';
 import subjectOfferingRoutes from './routes/subjectOffering.routes.js';
+import subjectRoutes from './routes/subject.routes.js';
 import settingsRoutes from './routes/settings.routes.js';
 import timmyRoutes from './routes/timmy.routes.js';
 import paymentRoutes from './routes/payment.routes.js';
@@ -39,6 +40,7 @@ app.use('/api/teachers', teacherRoutes); // Cleanly structured mounting point
 app.use('/api/rooms', roomRoutes); // Mount the room route
 app.use('/api/audit-logs', auditLogRoutes);
 app.use('/api/subject-offerings', subjectOfferingRoutes);
+app.use('/api/subjects', subjectRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/timmy', timmyRoutes);
 app.use('/api/payments', paymentRoutes);

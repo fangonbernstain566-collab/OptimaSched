@@ -94,6 +94,9 @@ model Teacher {
   userId          String         @unique
   departmentId    String
   maxTeachingLoad Int            @default(21)
+  // Free-form credential tags (e.g. "Masters in IT", "LET Passer") the teacher
+  // holds. Matched against Subject.requiredCredentials before assignment.
+  credentials     String[]       @default([])
   isDeleted       Boolean        @default(false)
   deletedAt       DateTime?
   availabilities  Availability[]
@@ -133,13 +136,17 @@ model Room {
 }
 
 model Subject {
-  id                 String              @id @default(uuid())
-  code               String              @unique
-  name               String
-  units              Int
-  isLabRequired      Boolean             @default(false)
-  offerings          SubjectOffering[]
-  curriculumSubjects CurriculumSubject[]
+  id                  String              @id @default(uuid())
+  code                String              @unique
+  name                String
+  units               Int
+  isLabRequired       Boolean             @default(false)
+  // Credential tags a teacher must ALL possess (matched against
+  // Teacher.credentials) before they can be assigned to this subject.
+  // Empty means no special credential is required.
+  requiredCredentials String[]            @default([])
+  offerings           SubjectOffering[]
+  curriculumSubjects  CurriculumSubject[]
 }
 
 model SubjectOffering {

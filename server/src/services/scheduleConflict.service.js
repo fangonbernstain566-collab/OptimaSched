@@ -1,4 +1,5 @@
 import prisma from '../config/prisma.js';
+import { assertTeacherMeetsSubjectCredentials } from '../utils/credentialCheck.js';
 
 export class ScheduleConflictService {
   /**
@@ -27,6 +28,9 @@ export class ScheduleConflictService {
     if (offering.subject.isLabRequired && room.type === 'LECTURE_ROOM') {
       throw new Error(`Subject requires laboratory environment. Room '${room.name}' is designated for Lectures.`);
     }
+
+    // 2b. Teacher Credential Validation
+    await assertTeacherMeetsSubjectCredentials(teacherId, subjectOfferingId);
 
     // 3. Teacher Availability Check
     const convertedProposedStart = this.timeToMinutes(startTime);

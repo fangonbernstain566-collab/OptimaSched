@@ -7,6 +7,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import Schedules from './pages/Schedules';
 import TeacherManager from './components/TeacherManager';
 import RoomManager from './components/RoomManager';
+import SubjectCredentialManager from './components/SubjectCredentialManager';
 import ManageSchedules from './pages/ManageSchedules';
 import SchedulePlotter from './pages/SchedulePlotter';
 import RecentlyDeletedSchedules from './pages/RecentlyDeletedSchedules';
@@ -104,6 +105,15 @@ export default function App() {
           element={
             <ProtectedRoute allowedRoles={['ADMINISTRATOR']}>
               <RoomManager />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="subjects"
+          element={
+            <ProtectedRoute allowedRoles={['ADMINISTRATOR']}>
+              <SubjectCredentialManager />
             </ProtectedRoute>
           }
         />
