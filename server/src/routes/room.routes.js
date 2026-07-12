@@ -9,6 +9,14 @@ const router = Router();
 // read-only schedule view) — only mutations stay Administrator-only.
 router.use(authenticate);
 
+// Accepts either an array of strings or a comma-separated string from the UI
+// and normalizes it to a deduped, trimmed array of category tags.
+const normalizeCategories = (value) => {
+  if (value === undefined) return undefined;
+  const list = Array.isArray(value) ? value : String(value).split(',');
+  return [...new Set(list.map((c) => String(c).trim()).filter(Boolean))];
+};
+
 const VALID_ROOM_TYPES = [
   'LECTURE_ROOM',
   'COMPUTER_LABORATORY',
@@ -116,6 +124,7 @@ router.post('/', authorize('ADMINISTRATOR'), async (req, res) => {
       capacity,
       type = 'LECTURE_ROOM',
       buildingName = 'Main Building',
+      allowedCategories,
     } = req.body;
 
     if (!name || !capacity) {
@@ -176,6 +185,7 @@ router.post('/', authorize('ADMINISTRATOR'), async (req, res) => {
         capacity: parsedCapacity,
         type,
         buildingId: building.id,
+        allowedCategories: normalizeCategories(allowedCategories) ?? [],
       },
       include: {
         building: true,
@@ -221,6 +231,7 @@ router.put('/:id', authorize('ADMINISTRATOR'), async (req, res) => {
       capacity,
       type,
       buildingName,
+      allowedCategories,
     } = req.body;
 
     const existingRoom = await prisma.room.findUnique({
@@ -270,6 +281,8 @@ router.put('/:id', authorize('ADMINISTRATOR'), async (req, res) => {
       });
     }
 
+    const normalizedCategories = normalizeCategories(allowedCategories);
+
     const updatedRoom = await prisma.room.update({
       where: { id },
       data: {
@@ -277,6 +290,7 @@ router.put('/:id', authorize('ADMINISTRATOR'), async (req, res) => {
         capacity: parsedCapacity,
         type: type || existingRoom.type,
         buildingId,
+        ...(normalizedCategories !== undefined && { allowedCategories: normalizedCategories }),
       },
       include: {
         building: true,

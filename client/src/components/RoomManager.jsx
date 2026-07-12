@@ -31,10 +31,11 @@ const ROOM_TYPES = [
 ];
 
 const INITIAL_FORM = {
-  name:         '',
-  capacity:     40,
-  type:         'LECTURE_ROOM',
-  buildingName: 'Main Building',
+  name:              '',
+  capacity:          40,
+  type:              'LECTURE_ROOM',
+  buildingName:      'Main Building',
+  allowedCategories: '',
 };
 
 export default function RoomManager() {
@@ -100,10 +101,11 @@ export default function RoomManager() {
   const openEdit = (room) => {
     setEditTarget(room);
     setFormData({
-      name:         room.name ?? '',
-      capacity:     room.capacity ?? 40,
-      type:         room.type ?? 'LECTURE_ROOM',
-      buildingName: room.building?.name ?? 'Main Building',
+      name:              room.name ?? '',
+      capacity:          room.capacity ?? 40,
+      type:              room.type ?? 'LECTURE_ROOM',
+      buildingName:      room.building?.name ?? 'Main Building',
+      allowedCategories: (room.allowedCategories ?? []).join(', '),
     });
     setOpen(true);
   };
@@ -216,6 +218,7 @@ export default function RoomManager() {
                 <SortableTableCell label="Building" sortKey="building" sortBy={sort.sortBy} order={sort.order} onSort={handleSort} />
                 <SortableTableCell label="Type" sortKey="type" sortBy={sort.sortBy} order={sort.order} onSort={handleSort} />
                 <SortableTableCell label="Capacity" sortKey="capacity" sortBy={sort.sortBy} order={sort.order} onSort={handleSort} />
+                <TableCell>Allowed Categories</TableCell>
                 <SortableTableCell label="Date Created" sortKey="createdAt" sortBy={sort.sortBy} order={sort.order} onSort={handleSort} />
                 <TableCell>Schedules Using Room</TableCell>
                 <TableCell align="right">Actions</TableCell>
@@ -224,7 +227,7 @@ export default function RoomManager() {
             <TableBody>
               {rooms.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} align="center">
+                  <TableCell colSpan={8} align="center">
                     No rooms created yet.
                   </TableCell>
                 </TableRow>
@@ -235,6 +238,7 @@ export default function RoomManager() {
                     <TableCell>{room.building?.name || 'N/A'}</TableCell>
                     <TableCell>{room.type}</TableCell>
                     <TableCell>{room.capacity}</TableCell>
+                    <TableCell>{(room.allowedCategories ?? []).length > 0 ? room.allowedCategories.join(', ') : '-'}</TableCell>
                     <TableCell>{formatDate(room.createdAt)}</TableCell>
                     <TableCell>{room._count?.schedules || 0}</TableCell>
                     <TableCell align="right">
@@ -291,6 +295,13 @@ export default function RoomManager() {
                 <MenuItem key={rt.value} value={rt.value}>{rt.label}</MenuItem>
               ))}
             </TextField>
+            <TextField
+              label="Allowed Categories" name="allowedCategories"
+              value={formData.allowedCategories} onChange={handleChange}
+              placeholder="e.g. IT"
+              helperText="Comma-separated. Leave blank to allow any class. Must match a subject's required room category exactly."
+              fullWidth
+            />
 
             <Stack direction="row" spacing={1} justifyContent="flex-end">
               <Button onClick={closeModal}>Cancel</Button>
