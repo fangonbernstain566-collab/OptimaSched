@@ -3,6 +3,7 @@ import prisma from '../config/prisma.js';
 import { authenticate, authorize } from '../middleware/auth.js';
 import { logAudit } from '../utils/auditLog.js';
 import { assertTeacherMeetsSubjectCredentials } from '../utils/credentialCheck.js';
+import { assertRoomMatchesSubjectCategory } from '../utils/roomCategoryCheck.js';
 import { ScheduleConflictService } from '../services/scheduleConflict.service.js';
 import { NotificationService } from '../services/notification.service.js';
 
@@ -77,8 +78,11 @@ router.post('/', authorize('INSTRUCTOR'), async (req, res) => {
 
     try {
       await assertTeacherMeetsSubjectCredentials(teacher.id, subjectOfferingId);
-    } catch (credentialError) {
-      return res.status(400).json({ success: false, message: credentialError.message });
+      if (roomId) {
+        await assertRoomMatchesSubjectCategory(roomId, subjectOfferingId);
+      }
+    } catch (validationError) {
+      return res.status(400).json({ success: false, message: validationError.message });
     }
 
     const created = await prisma.scheduleRequest.create({

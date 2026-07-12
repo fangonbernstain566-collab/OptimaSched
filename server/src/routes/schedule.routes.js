@@ -4,6 +4,7 @@ import prisma from '../config/prisma.js';
 import { authenticate } from '../middleware/auth.js';
 import { logAudit } from '../utils/auditLog.js';
 import { assertTeacherMeetsSubjectCredentials } from '../utils/credentialCheck.js';
+import { assertRoomMatchesSubjectCategory } from '../utils/roomCategoryCheck.js';
 import { z } from 'zod';
 
 const router = Router();
@@ -141,8 +142,9 @@ router.post('/', async (req, res) => {
 
     try {
       await assertTeacherMeetsSubjectCredentials(teacherId, subjectOfferingId);
-    } catch (credentialError) {
-      return res.status(400).json({ success: false, message: credentialError.message });
+      await assertRoomMatchesSubjectCategory(roomId, subjectOfferingId);
+    } catch (validationError) {
+      return res.status(400).json({ success: false, message: validationError.message });
     }
 
     // ✅ FIX: create happens FIRST, only once, before anything references it
@@ -188,8 +190,11 @@ router.post('/validate', async (req, res) => {
     if (subjectOfferingId) {
       try {
         await assertTeacherMeetsSubjectCredentials(teacherId, subjectOfferingId);
-      } catch (credentialError) {
-        return res.status(400).json({ success: false, message: credentialError.message });
+        if (roomId) {
+          await assertRoomMatchesSubjectCategory(roomId, subjectOfferingId);
+        }
+      } catch (validationError) {
+        return res.status(400).json({ success: false, message: validationError.message });
       }
     }
 
@@ -231,11 +236,19 @@ router.post('/confirm', async (req, res) => {
   try {
     const existing = await prisma.schedule.findUnique({
       where: { id: scheduleId },
-      select: { id: true, isDeleted: true },
+      select: { id: true, isDeleted: true, subjectOfferingId: true },
     });
 
     if (!existing || existing.isDeleted) {
       return res.status(404).json({ success: false, message: 'Schedule not found.' });
+    }
+
+    if (roomId) {
+      try {
+        await assertRoomMatchesSubjectCategory(roomId, existing.subjectOfferingId);
+      } catch (validationError) {
+        return res.status(400).json({ success: false, message: validationError.message });
+      }
     }
 
     const updated = await prisma.schedule.update({
@@ -297,8 +310,9 @@ router.put('/:id', async (req, res) => {
 
     try {
       await assertTeacherMeetsSubjectCredentials(teacherId, subjectOfferingId);
-    } catch (credentialError) {
-      return res.status(400).json({ success: false, message: credentialError.message });
+      await assertRoomMatchesSubjectCategory(roomId, subjectOfferingId);
+    } catch (validationError) {
+      return res.status(400).json({ success: false, message: validationError.message });
     }
 
     const updated = await prisma.schedule.update({

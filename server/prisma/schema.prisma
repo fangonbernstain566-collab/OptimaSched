@@ -126,6 +126,10 @@ model Room {
   name       String
   capacity   Int
   type       RoomType   @default(LECTURE_ROOM)
+  // Class-category tags this room may host (e.g. "IT", "MARITIME"). Empty
+  // means unrestricted (open to any subject, matching room type). Matched
+  // against Subject.requiredRoomCategories before a schedule is assigned.
+  allowedCategories String[] @default([])
   buildingId String
   isDeleted  Boolean    @default(false)
   deletedAt  DateTime?
@@ -145,6 +149,10 @@ model Subject {
   // Teacher.credentials) before they can be assigned to this subject.
   // Empty means no special credential is required.
   requiredCredentials String[]            @default([])
+  // Class-category tags describing what kind of room this subject needs
+  // (e.g. "IT", "MARITIME"), matched against Room.allowedCategories. Empty
+  // means this subject has no special room requirement.
+  requiredRoomCategories String[]         @default([])
   offerings           SubjectOffering[]
   curriculumSubjects  CurriculumSubject[]
 }

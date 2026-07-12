@@ -16,15 +16,18 @@ router.get('/', async (req, res) => {
   }
 });
 
+const cleanTagArray = (value) => {
+  if (!Array.isArray(value) || !value.every((c) => typeof c === 'string')) return null;
+  return [...new Set(value.map((c) => c.trim()).filter(Boolean))];
+};
+
 // ─── PATCH /:id/credentials: Set which credentials a subject requires ───────
 router.patch('/:id/credentials', authorize('ADMINISTRATOR'), async (req, res) => {
   try {
-    const { requiredCredentials } = req.body;
-    if (!Array.isArray(requiredCredentials) || !requiredCredentials.every((c) => typeof c === 'string')) {
+    const cleaned = cleanTagArray(req.body.requiredCredentials);
+    if (cleaned === null) {
       return res.status(400).json({ success: false, message: 'requiredCredentials must be an array of strings.' });
     }
-
-    const cleaned = [...new Set(requiredCredentials.map((c) => c.trim()).filter(Boolean))];
 
     const updated = await prisma.subject.update({
       where: { id: req.params.id },
@@ -41,6 +44,34 @@ router.patch('/:id/credentials', authorize('ADMINISTRATOR'), async (req, res) =>
     });
 
     return res.json({ success: true, message: 'Required credentials updated.', data: updated });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// ─── PATCH /:id/room-categories: Set which room categories a subject needs ──
+router.patch('/:id/room-categories', authorize('ADMINISTRATOR'), async (req, res) => {
+  try {
+    const cleaned = cleanTagArray(req.body.requiredRoomCategories);
+    if (cleaned === null) {
+      return res.status(400).json({ success: false, message: 'requiredRoomCategories must be an array of strings.' });
+    }
+
+    const updated = await prisma.subject.update({
+      where: { id: req.params.id },
+      data: { requiredRoomCategories: cleaned },
+    });
+
+    await logAudit(req, {
+      action: 'SUBJECT_ROOM_CATEGORIES_UPDATE',
+      module: 'ROOM_MANAGEMENT',
+      description: `${req.user.firstName} set required room categories for ${updated.name}.`,
+      targetRecordId: updated.id,
+      targetRecordName: updated.name,
+      metadata: { requiredRoomCategories: cleaned },
+    });
+
+    return res.json({ success: true, message: 'Required room categories updated.', data: updated });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
   }

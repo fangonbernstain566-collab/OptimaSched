@@ -15,6 +15,7 @@ export default function SubjectCredentialManager() {
   const [loading, setLoading]   = useState(true);
   const [editTarget, setEditTarget] = useState(null);
   const [credentialsInput, setCredentialsInput] = useState('');
+  const [roomCategoriesInput, setRoomCategoriesInput] = useState('');
   const { toast, showToast, hideToast } = useToast();
 
   const getAuthHeaders = () => {
@@ -39,33 +40,34 @@ export default function SubjectCredentialManager() {
   const openEdit = (subject) => {
     setEditTarget(subject);
     setCredentialsInput((subject.requiredCredentials ?? []).join(', '));
+    setRoomCategoriesInput((subject.requiredRoomCategories ?? []).join(', '));
   };
 
   const closeModal = () => {
     setEditTarget(null);
     setCredentialsInput('');
+    setRoomCategoriesInput('');
   };
+
+  const parseTagInput = (value) => value.split(',').map((c) => c.trim()).filter(Boolean);
 
   const handleSave = async (e) => {
     e.preventDefault();
     try {
-      const requiredCredentials = credentialsInput
-        .split(',')
-        .map((c) => c.trim())
-        .filter(Boolean);
+      const requiredCredentials = parseTagInput(credentialsInput);
+      const requiredRoomCategories = parseTagInput(roomCategoriesInput);
 
-      const response = await axios.patch(
-        `/api/subjects/${editTarget.id}/credentials`,
-        { requiredCredentials },
-        getAuthHeaders()
-      );
-      if (response.data.success) {
-        showToast(response.data.message ?? 'Required credentials updated.', 'success');
+      const [credRes, roomRes] = await Promise.all([
+        axios.patch(`/api/subjects/${editTarget.id}/credentials`, { requiredCredentials }, getAuthHeaders()),
+        axios.patch(`/api/subjects/${editTarget.id}/room-categories`, { requiredRoomCategories }, getAuthHeaders()),
+      ]);
+      if (credRes.data.success && roomRes.data.success) {
+        showToast('Subject requirements updated.', 'success');
         closeModal();
         fetchSubjects();
       }
     } catch (error) {
-      showToast(error.response?.data?.message ?? 'Failed to update required credentials.', 'error');
+      showToast(error.response?.data?.message ?? 'Failed to update subject requirements.', 'error');
     }
   };
 
@@ -79,8 +81,9 @@ export default function SubjectCredentialManager() {
             Subject Credential Requirements
           </Typography>
           <Typography color="text.secondary">
-            Set which credentials an instructor must hold to be assigned to a subject
-            (e.g. "Masters in IT" for IT subjects). Leave blank for no restriction.
+            Set which credentials an instructor must hold, and which classroom categories
+            a class must be held in (e.g. "Masters in IT" and "IT" room category for IT
+            subjects). Leave blank for no restriction.
           </Typography>
         </Box>
 
@@ -97,13 +100,14 @@ export default function SubjectCredentialManager() {
                     <TableCell sx={{ fontWeight: 'bold' }}>Code</TableCell>
                     <TableCell sx={{ fontWeight: 'bold' }}>Subject</TableCell>
                     <TableCell sx={{ fontWeight: 'bold' }}>Required Credentials</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold' }}>Required Room Categories</TableCell>
                     <TableCell align="right" sx={{ fontWeight: 'bold' }}>Actions</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {subjects.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={4} align="center" sx={{ py: 6, color: 'text.disabled' }}>
+                      <TableCell colSpan={5} align="center" sx={{ py: 6, color: 'text.disabled' }}>
                         No subjects found.
                       </TableCell>
                     </TableRow>
@@ -115,6 +119,11 @@ export default function SubjectCredentialManager() {
                         <TableCell>
                           {(s.requiredCredentials ?? []).length > 0
                             ? s.requiredCredentials.join(', ')
+                            : <Typography component="span" color="text.disabled">None</Typography>}
+                        </TableCell>
+                        <TableCell>
+                          {(s.requiredRoomCategories ?? []).length > 0
+                            ? s.requiredRoomCategories.join(', ')
                             : <Typography component="span" color="text.disabled">None</Typography>}
                         </TableCell>
                         <TableCell align="right">
@@ -147,6 +156,13 @@ export default function SubjectCredentialManager() {
                   onChange={(e) => setCredentialsInput(e.target.value)}
                   placeholder="e.g. Masters in IT"
                   helperText="Comma-separated. Must match a teacher's credential tags exactly."
+                />
+                <TextField
+                  label="Required Room Categories" fullWidth
+                  value={roomCategoriesInput}
+                  onChange={(e) => setRoomCategoriesInput(e.target.value)}
+                  placeholder="e.g. IT"
+                  helperText="Comma-separated. Must match a room's allowed category tags exactly."
                 />
                 <Button fullWidth variant="contained" type="submit"
                   sx={{ py: 1.5, bgcolor: '#2563eb', borderRadius: '10px', textTransform: 'none' }}>
